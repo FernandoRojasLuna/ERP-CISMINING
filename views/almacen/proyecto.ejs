@@ -1,0 +1,508 @@
+<%
+  const currentMateriales = Array.isArray(locals.materiales) ? locals.materiales : [];
+  const currentProyectos = Array.isArray(locals.proyectos) ? locals.proyectos : [];
+  const currentAsignaciones = Array.isArray(locals.asignaciones) ? locals.asignaciones : [];
+  const currentMetricas = (typeof locals.metricas === 'object' && locals.metricas) ? locals.metricas : {
+    totalMateriales: currentMateriales.length,
+    totalProyectos: currentProyectos.length,
+    totalAsignaciones: currentAsignaciones.length,
+    valorAlmacen: 0,
+    totalMovimientos: 0
+  };
+  const currentSelectedProyecto = (typeof locals.selectedProyecto === 'object' && locals.selectedProyecto)
+    ? locals.selectedProyecto
+    : null;
+  const currentSelectedProyectoItems = Array.isArray(locals.selectedProyectoItems) ? locals.selectedProyectoItems : [];
+  const currentAsignacionEdit = (typeof locals.asignacionEdit === 'object' && locals.asignacionEdit)
+    ? locals.asignacionEdit
+    : null;
+
+  const materiales = currentMateriales;
+  const proyectos = currentProyectos;
+  const metricas = currentMetricas;
+  const selectedProyecto = currentSelectedProyecto;
+  const selectedProyectoItems = currentSelectedProyectoItems;
+  const asignacionEdit = currentAsignacionEdit;
+
+  const fechaReporte = new Date();
+  const fmtFecha = (date) => {
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+  const fmtMonto = (num) => `S/ ${Number(num || 0).toFixed(2)}`;
+  const up = (value, fallback = '-') => {
+    const cleaned = String(value || '').trim();
+    return cleaned ? cleaned.toUpperCase() : fallback;
+  };
+%>
+
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Almacen por Proyecto</h1>
+    <p>Gestion detallada de materiales asignados para la obra seleccionada</p>
+  </div>
+  <div class="d-flex align-items-center gap-2 no-print">
+    <a href="/almacen?mod=almacen" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Volver a tarjetas
+    </a>
+    <button type="button" class="btn btn-export-pdf" onclick="exportarProyectoPDF()">
+      <i class="bi bi-file-earmark-pdf"></i> Exportar Proyecto a PDF
+    </button>
+  </div>
+</div>
+
+<section class="module-print-report print-only project-print-report" aria-hidden="true">
+  <div class="module-print-banner">
+    <div class="module-print-brand">
+      <div class="module-print-logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64" role="img" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="14" fill="#0f172a"></rect>
+          <path d="M18 44V20h8l6 8 6-8h8v24h-8V33l-6 8-6-8v11h-8z" fill="#f8fafc"></path>
+          <rect x="12" y="48" width="40" height="5" rx="2.5" fill="#d4a017"></rect>
+        </svg>
+      </div>
+      <div>
+        <p class="module-print-company">Cismining</p>
+        <p class="module-print-system">ERP Construccion</p>
+      </div>
+    </div>
+    <div class="module-print-docmeta">
+      <span>DOC-ALM-PROY</span>
+      <strong>Version 1.0</strong>
+    </div>
+  </div>
+  <div class="module-print-head">
+    <div>
+      <p class="module-print-eyebrow">Documento corporativo</p>
+      <h2>Reporte de Almacen por Proyecto</h2>
+      <p>Control de materiales asignados para la obra seleccionada.</p>
+    </div>
+    <div class="module-print-meta-right">
+      <div><strong>Proyecto:</strong> <%= up(selectedProyecto?.nombre || '-') %></div>
+      <div><strong>Emitido:</strong> <%= fmtFecha(fechaReporte) %></div>
+      <div><strong>Preparado por:</strong> <%= up(currentUser?.nombre || 'SISTEMA') %></div>
+    </div>
+  </div>
+  <div class="module-print-metrics">
+    <article><span>Materiales</span><strong><%= selectedProyectoItems.length %></strong></article>
+    <article><span>Valor total</span><strong><%= fmtMonto(selectedProyectoItems.reduce((acc, item) => acc + Number(item.importe || 0), 0)) %></strong></article>
+    <article><span>Estado obra</span><strong><%= up(selectedProyecto?.estado || '-') %></strong></article>
+    <article><span>Clasificacion</span><strong>USO INTERNO</strong></article>
+  </div>
+  <table class="table table-sm module-print-table">
+    <thead>
+      <tr>
+        <th>Material</th>
+        <th>Unidad</th>
+        <th>Cantidad</th>
+        <th>Precio</th>
+        <th>Importe</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% selectedProyectoItems.forEach((item) => { %>
+        <tr>
+          <td><%= up(item.material_nombre) %></td>
+          <td><%= up(item.unidad) %></td>
+          <td><strong><%= Number(item.cantidad_disponible || 0).toFixed(2) %></strong></td>
+          <td><%= fmtMonto(item.precio_unitario) %></td>
+          <td><strong><%= fmtMonto(item.importe) %></strong></td>
+        </tr>
+      <% }) %>
+      <% if (!selectedProyectoItems.length) { %>
+        <tr><td colspan="5" class="text-center">Sin materiales asignados para esta obra.</td></tr>
+      <% } %>
+    </tbody>
+  </table>
+</section>
+
+<div class="submodule-shell no-print">
+  <nav class="submodule-tabs" aria-label="Submodulos de almacen">
+    <a href="/almacen?mod=base-materiales" class="submodule-tab">
+      <i class="bi bi-database"></i>
+      <span>Base de Datos Materiales</span>
+    </a>
+    <a href="/almacen?mod=almacen" class="submodule-tab active">
+      <i class="bi bi-boxes"></i>
+      <span>Almacen por Proyecto</span>
+    </a>
+    <a href="/almacen?mod=movimientos" class="submodule-tab">
+      <i class="bi bi-arrow-left-right"></i>
+      <span>Movimientos</span>
+    </a>
+  </nav>
+
+  <div class="row g-3 submodule-kpis">
+    <div class="col-md-3 col-sm-6">
+      <div class="kpi-mini">
+        <div class="kpi-mini-left"><i class="bi bi-building"></i><span class="kpi-mini-label">Proyecto</span></div>
+        <span class="kpi-mini-value"><%= up(selectedProyecto?.nombre || '-') %></span>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="kpi-mini">
+        <div class="kpi-mini-left"><i class="bi bi-clipboard-data"></i><span class="kpi-mini-label">Estado</span></div>
+        <span class="kpi-mini-value"><%= up(selectedProyecto?.estado || '-') %></span>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="kpi-mini">
+        <div class="kpi-mini-left"><i class="bi bi-box2"></i><span class="kpi-mini-label">Asignaciones</span></div>
+        <span class="kpi-mini-value"><%= selectedProyectoItems.length %></span>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="kpi-mini">
+        <div class="kpi-mini-left"><i class="bi bi-cash-stack"></i><span class="kpi-mini-label">Valor</span></div>
+        <span class="kpi-mini-value"><%= fmtMonto(selectedProyectoItems.reduce((acc, item) => acc + Number(item.importe || 0), 0)) %></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-lg-5">
+      <div class="form-section">
+        <div class="form-section-title"><i class="bi bi-box-arrow-in-down"></i> Asignar material a proyecto</div>
+        <div class="form-section-body">
+          <form action="<%= asignacionEdit ? '/almacen/asignaciones/' + asignacionEdit.id + '?_method=PUT' : '/almacen/asignaciones' %>" method="post" class="row g-3" id="formAsignacionProyecto">
+            <div class="col-12">
+              <label class="form-label">Proyecto</label>
+              <select name="proyecto_id" class="form-select" required>
+                <% proyectos.forEach((p) => { %>
+                  <option value="<%= p.id %>" <%= Number(p.id) === Number(selectedProyecto.id) ? 'selected' : '' %>><%= up(p.nombre) %> · <%= up(p.estado) %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Material base</label>
+              <input type="hidden" name="material_id" id="materialBaseId" value="<%= asignacionEdit ? asignacionEdit.material_id : '' %>" required>
+              <input type="text" class="form-control" id="materialBaseSearch" placeholder="Escribe codigo o nombre del material" autocomplete="off" required>
+              <div id="materialBaseSuggestions" class="live-search-list" role="listbox" aria-label="Sugerencias de materiales"></div>
+              <select class="form-select d-none" id="materialBaseCatalog">
+                <option value="">Selecciona material</option>
+                <% materiales.forEach((m) => { %>
+                  <option
+                    value="<%= m.id %>"
+                    data-label="<%= up(m.codigo) %> · <%= up(m.nombre) %>"
+                    data-nombre="<%= up(m.nombre) %>"
+                    data-unidad="<%= up(m.unidad || '-') %>"
+                    data-costo="<%= Number(m.costo_unitario || 0) %>"
+                    <%= asignacionEdit && Number(asignacionEdit.material_id) === Number(m.id) ? 'selected' : '' %>>
+                    <%= up(m.codigo) %> · <%= up(m.nombre) %>
+                  </option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Descripcion</label>
+              <input class="form-control" id="materialDescripcion" readonly placeholder="Se autocompleta con el material">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Unidad</label>
+              <input class="form-control" id="materialUnidad" readonly placeholder="-">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Cant.</label>
+              <input name="cantidad" id="asigCantidad" type="number" step="0.01" min="0" class="form-control" placeholder="0" value="<%= asignacionEdit ? Number(asignacionEdit.cantidad_presupuestada || 0).toFixed(2) : '' %>" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Precio</label>
+              <input name="precio_unitario" id="asigPrecio" type="number" step="0.01" min="0" class="form-control" placeholder="0.00" value="<%= asignacionEdit ? Number(asignacionEdit.precio_unitario || 0).toFixed(2) : '' %>" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Importe</label>
+              <input id="asigImporte" type="text" class="form-control" readonly placeholder="S/ 0.00">
+            </div>
+            <div class="col-12 pt-1 d-flex gap-2">
+              <button class="btn btn-primary">
+                <i class="bi bi-<%= asignacionEdit ? 'check2-square' : 'plus-circle' %>"></i>
+                <%= asignacionEdit ? 'Actualizar asignacion' : 'Agregar al proyecto' %>
+              </button>
+              <% if (asignacionEdit) { %>
+                <a href="/almacen/proyectos/<%= selectedProyecto.id %>" class="btn btn-outline-secondary">
+                  <i class="bi bi-x-lg"></i> Cancelar
+                </a>
+              <% } %>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="panel-card mb-3">
+        <div class="panel-card-header">
+          <div class="panel-title"><i class="bi bi-funnel"></i> Filtro de materiales</div>
+        </div>
+        <div class="panel-body">
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label">Codigo</label>
+              <input type="text" id="filtroProyectoCodigo" class="form-control" placeholder="Filtrar por codigo">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Material</label>
+              <input type="text" id="filtroProyectoMaterial" class="form-control" placeholder="Filtrar por material">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Familia / Grupo / Subgrupo</label>
+              <input type="text" id="filtroProyectoClasificacion" class="form-control" placeholder="Filtrar por clasificacion">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <div class="panel-title"><i class="bi bi-box-seam"></i> Catalogo de materiales · <%= up(selectedProyecto.nombre) %></div>
+          <span class="badge badge-secondary"><%= selectedProyectoItems.length %> registros</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle table-hover" id="tablaProyectoMateriales">
+            <thead>
+              <tr>
+                <th>Material</th>
+                <th>Cant. Presupuestada</th>
+                <th>Stock Actual</th>
+                <th>Cant. Consumida</th>
+                <th>Saldo por Comprar</th>
+                <th>Accion</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% selectedProyectoItems.forEach((item) => { %>
+                <tr
+                  data-codigo="<%= up(item.codigo) %>"
+                  data-material="<%= up(item.material_nombre) %>"
+                  data-familia="<%= up(item.familia || '') %>"
+                  data-grupo="<%= up(item.grupo_material || '') %>"
+                  data-subgrupo="<%= up(item.subgrupo || '') %>">
+                  <td>
+                    <div class="fw-semibold"><%= up(item.material_nombre) %></div>
+                    <small class="text-muted"><%= up(item.codigo) %> · <%= up(item.familia || '-') %></small>
+                  </td>
+                  <td><strong><%= Number(item.cantidad_presupuestada || 0).toFixed(2) %> <%= up(item.unidad) %></strong></td>
+                  <td class="fw-semibold"><%= Number(item.stock_fisico || 0).toFixed(2) %> <%= up(item.unidad) %></td>
+                  <td><%= Number(item.cantidad_consumida || 0).toFixed(2) %> <%= up(item.unidad) %></td>
+                  <td><%= Number(item.saldo_por_comprar || 0).toFixed(2) %> <%= up(item.unidad) %></td>
+                  <td>
+                    <div class="d-flex gap-1">
+                      <a href="/almacen/proyectos/<%= selectedProyecto.id %>?assignEdit=<%= item.id %>" class="btn btn-xs btn-primary" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                      </a>
+                      <form action="/almacen/asignaciones/<%= item.id %>?_method=DELETE" method="post" onsubmit="return confirm('¿Eliminar el material del proyecto seleccionado?')">
+                        <button class="btn btn-xs btn-outline-danger" type="submit" title="Eliminar">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!selectedProyectoItems.length) { %>
+                <tr><td colspan="6"><div class="empty-state"><i class="bi bi-box-seam"></i><p>Sin materiales asignados en esta obra</p></div></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function exportarProyectoPDF() {
+    document.body.classList.add('print-project-almacen');
+    window.print();
+    setTimeout(function() {
+      document.body.classList.remove('print-project-almacen');
+    }, 250);
+  }
+
+  (function initAsignacionForm() {
+    var materialCatalog = document.getElementById('materialBaseCatalog');
+    var materialIdInput = document.getElementById('materialBaseId');
+    var materialSearchInput = document.getElementById('materialBaseSearch');
+    var suggestions = document.getElementById('materialBaseSuggestions');
+    var descInput = document.getElementById('materialDescripcion');
+    var unidadInput = document.getElementById('materialUnidad');
+    var cantidadInput = document.getElementById('asigCantidad');
+    var precioInput = document.getElementById('asigPrecio');
+    var importeInput = document.getElementById('asigImporte');
+
+    if (!materialCatalog || !materialIdInput || !materialSearchInput || !suggestions || !descInput || !unidadInput || !cantidadInput || !precioInput || !importeInput) {
+      return;
+    }
+
+    var materials = Array.prototype.slice.call(materialCatalog.options)
+      .filter(function(opt) { return opt.value; })
+      .map(function(opt) {
+        return {
+          id: String(opt.value),
+          label: String(opt.getAttribute('data-label') || opt.textContent || '').toUpperCase(),
+          nombre: String(opt.getAttribute('data-nombre') || '').toUpperCase(),
+          unidad: String(opt.getAttribute('data-unidad') || '-').toUpperCase(),
+          costo: Number(opt.getAttribute('data-costo') || 0)
+        };
+      });
+
+    var selectedMaterial = null;
+
+    function clearSuggestions() {
+      suggestions.innerHTML = '';
+      suggestions.classList.remove('open');
+    }
+
+    function renderSuggestions(items) {
+      clearSuggestions();
+      if (!items.length) {
+        return;
+      }
+
+      var fragment = document.createDocumentFragment();
+      items.slice(0, 25).forEach(function(item) {
+        var option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'live-search-item';
+        option.textContent = item.label;
+        option.addEventListener('click', function() {
+          selectedMaterial = item;
+          materialIdInput.value = item.id;
+          materialSearchInput.value = item.label;
+          descInput.value = item.nombre;
+          unidadInput.value = item.unidad;
+          if (precioInput.value === '' && item.costo > 0) {
+            precioInput.value = item.costo.toFixed(2);
+          }
+          syncImporte();
+          clearSuggestions();
+        });
+        fragment.appendChild(option);
+      });
+
+      suggestions.appendChild(fragment);
+      suggestions.classList.add('open');
+    }
+
+    function findMaterialById(id) {
+      return materials.find(function(item) { return item.id === String(id); }) || null;
+    }
+
+    function syncFromSelectedMaterial() {
+      if (!selectedMaterial) {
+        descInput.value = '';
+        unidadInput.value = '-';
+        return;
+      }
+      descInput.value = selectedMaterial.nombre;
+      unidadInput.value = selectedMaterial.unidad;
+      if (precioInput.value === '' && selectedMaterial.costo > 0) {
+        precioInput.value = selectedMaterial.costo.toFixed(2);
+      }
+      syncImporte();
+    }
+
+    function syncImporte() {
+      var cant = Number(cantidadInput.value || 0);
+      var precio = Number(precioInput.value || 0);
+      importeInput.value = 'S/ ' + (cant * precio).toFixed(2);
+    }
+
+    materialSearchInput.addEventListener('input', function() {
+      var term = String(materialSearchInput.value || '').trim().toUpperCase();
+      selectedMaterial = null;
+      materialIdInput.value = '';
+
+      if (!term) {
+        clearSuggestions();
+        descInput.value = '';
+        unidadInput.value = '-';
+        syncImporte();
+        return;
+      }
+
+      var matched = materials.filter(function(item) {
+        return item.label.indexOf(term) !== -1 || item.nombre.indexOf(term) !== -1;
+      });
+
+      renderSuggestions(matched);
+    });
+
+    materialSearchInput.addEventListener('blur', function() {
+      setTimeout(clearSuggestions, 150);
+    });
+
+    materialSearchInput.addEventListener('focus', function() {
+      var term = String(materialSearchInput.value || '').trim().toUpperCase();
+      if (!term) return;
+      var matched = materials.filter(function(item) {
+        return item.label.indexOf(term) !== -1 || item.nombre.indexOf(term) !== -1;
+      });
+      renderSuggestions(matched);
+    });
+
+    cantidadInput.addEventListener('input', syncImporte);
+    precioInput.addEventListener('input', syncImporte);
+
+    if (materialIdInput.value) {
+      selectedMaterial = findMaterialById(materialIdInput.value);
+      if (selectedMaterial) {
+        materialSearchInput.value = selectedMaterial.label;
+      }
+    }
+
+    syncFromSelectedMaterial();
+
+    var form = document.getElementById('formAsignacionProyecto');
+    if (form) {
+      form.addEventListener('submit', function(e) {
+        if (!materialIdInput.value) {
+          e.preventDefault();
+          materialSearchInput.focus();
+        }
+      });
+    }
+  })();
+
+  (function initProyectoFilters() {
+    var codigoFilter = document.getElementById('filtroProyectoCodigo');
+    var materialFilter = document.getElementById('filtroProyectoMaterial');
+    var classFilter = document.getElementById('filtroProyectoClasificacion');
+    var table = document.getElementById('tablaProyectoMateriales');
+    if (!codigoFilter || !materialFilter || !classFilter || !table) {
+      return;
+    }
+
+    var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr'))
+      .filter(function(row) { return row.dataset && row.dataset.codigo !== undefined; });
+
+    function normalize(value) {
+      return String(value || '').trim().toUpperCase();
+    }
+
+    function applyFilter() {
+      var codigoValue = normalize(codigoFilter.value);
+      var materialValue = normalize(materialFilter.value);
+      var classValue = normalize(classFilter.value);
+
+      rows.forEach(function(row) {
+        var codigo = normalize(row.dataset.codigo);
+        var material = normalize(row.dataset.material);
+        var familia = normalize(row.dataset.familia);
+        var grupo = normalize(row.dataset.grupo);
+        var subgrupo = normalize(row.dataset.subgrupo);
+
+        var matchCodigo = !codigoValue || codigo.indexOf(codigoValue) !== -1;
+        var matchMaterial = !materialValue || material.indexOf(materialValue) !== -1;
+        var matchClass = !classValue || familia.indexOf(classValue) !== -1 || grupo.indexOf(classValue) !== -1 || subgrupo.indexOf(classValue) !== -1;
+
+        row.style.display = (matchCodigo && matchMaterial && matchClass) ? '' : 'none';
+      });
+    }
+
+    codigoFilter.addEventListener('input', applyFilter);
+    materialFilter.addEventListener('input', applyFilter);
+    classFilter.addEventListener('input', applyFilter);
+  })();
+</script>

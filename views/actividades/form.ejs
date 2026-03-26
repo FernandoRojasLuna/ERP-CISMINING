@@ -1,0 +1,56 @@
+<div class="panel-card form-card">
+  <form action="<%= actividad?.id ? '/actividades/' + actividad.id + '?_method=PUT' : '/actividades' %>" method="post" class="row g-3">
+    <div class="col-md-3">
+      <label class="form-label">Codigo</label>
+      <input name="codigo" class="form-control" value="<%= actividad?.codigo || '' %>" placeholder="ACT-00000001">
+      <small class="text-secondary">Si lo dejas vacio, se genera automaticamente.</small>
+    </div>
+    <div class="col-md-9"><label class="form-label">Nombre</label><input name="nombre" class="form-control" value="<%= actividad?.nombre || '' %>" required></div>
+    <div class="col-12"><label class="form-label">Descripcion</label><textarea name="descripcion" class="form-control" rows="2"><%= actividad?.descripcion || '' %></textarea></div>
+    <div class="col-md-4">
+      <label class="form-label">Proyecto</label>
+      <select name="proyecto_id" class="form-select" required>
+        <% proyectos.forEach(p => { %>
+          <option value="<%= p.id %>" <%= Number(actividad?.proyecto_id || 0) === Number(p.id) ? 'selected' : '' %>><%= p.nombre %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Responsable</label>
+      <select name="responsable_id" class="form-select">
+        <option value="">Sin responsable</option>
+        <% empleados.forEach(e => { %>
+          <option value="<%= e.id %>" <%= Number(actividad?.responsable_id || 0) === Number(e.id) ? 'selected' : '' %>><%= e.nombre %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Partida</label>
+      <input name="partida" class="form-control" value="<%= actividad?.partida || '' %>" placeholder="001-00000001">
+      <small class="text-secondary">Si lo dejas vacio, se genera por proyecto.</small>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Prioridad</label>
+      <select name="prioridad" class="form-select">
+        <option <%= actividad?.prioridad === 'Alta' ? 'selected' : '' %>>Alta</option>
+        <option <%= actividad?.prioridad === 'Media' ? 'selected' : '' %>>Media</option>
+        <option <%= actividad?.prioridad === 'Baja' ? 'selected' : '' %>>Baja</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Estado</label>
+      <select name="estado" class="form-select">
+        <option <%= actividad?.estado === 'Pendiente' ? 'selected' : '' %>>Pendiente</option>
+        <option <%= actividad?.estado === 'En proceso' ? 'selected' : '' %>>En proceso</option>
+        <option <%= actividad?.estado === 'Observada' ? 'selected' : '' %>>Observada</option>
+        <option <%= actividad?.estado === 'Completada' ? 'selected' : '' %>>Completada</option>
+      </select>
+    </div>
+    <div class="col-md-3"><label class="form-label">Inicio</label><input type="date" name="fecha_inicio_programada" class="form-control" value="<%= actividad?.fecha_inicio_programada ? actividad.fecha_inicio_programada.toISOString().slice(0,10) : '' %>"></div>
+    <div class="col-md-3"><label class="form-label">Fin</label><input type="date" name="fecha_fin_programada" class="form-control" value="<%= actividad?.fecha_fin_programada ? actividad.fecha_fin_programada.toISOString().slice(0,10) : '' %>"></div>
+    <div class="col-md-4"><label class="form-label">Meta cantidad</label><input type="number" step="0.01" name="meta_cantidad" class="form-control" value="<%= actividad?.meta_cantidad ?? '' %>"></div>
+    <div class="col-md-4"><label class="form-label">Unidad</label><input name="unidad_meta" class="form-control" placeholder="m2, m3, ml" value="<%= actividad?.unidad_meta || '' %>"></div>
+    <div class="col-md-4"><label class="form-label">Avance</label><input type="number" name="avance_porcentaje" class="form-control" min="0" max="100" value="<%= actividad?.avance_porcentaje ?? 0 %>"></div>
+    <div class="col-12 d-flex gap-2"><button class="btn btn-primary"><%= actividad?.id ? 'Actualizar' : 'Guardar' %></button><a href="/actividades" class="btn btn-outline-secondary">Cancelar</a></div>
+  </form>
+</div>

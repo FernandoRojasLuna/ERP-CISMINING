@@ -1,0 +1,370 @@
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Actividades</h1>
+    <p>Control de tareas, seguimiento y actualización de avance por proyecto</p>
+  </div>
+  <div class="d-flex align-items-center gap-2 no-print">
+    <% if (currentUser.role === 'admin') { %>
+      <a href="/actividades/nuevo" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Nueva Actividad
+      </a>
+    <% } %>
+    <button type="button" class="btn btn-export-pdf" onclick="exportarModuloPDF()">
+      <i class="bi bi-filetype-pdf"></i> Exportar a PDF
+    </button>
+  </div>
+</div>
+
+<%
+  const fechaReporte = new Date();
+  const actividadesTotal = actividades.length;
+  const actividadesCompletadas = actividades.filter((a) => (a.estado || '').toLowerCase() === 'completada').length;
+  const actividadesProceso = actividades.filter((a) => (a.estado || '').toLowerCase() === 'en proceso').length;
+  const actividadesAvanceProm = actividadesTotal
+    ? (actividades.reduce((acc, a) => acc + Number(a.avance_porcentaje || 0), 0) / actividadesTotal)
+    : 0;
+  const fmtFecha = (date) => {
+    if (!date) return '-';
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const proyectosListado = (typeof proyectos !== 'undefined' && Array.isArray(proyectos)) ? proyectos : [];
+  const filtrosAplicados = (typeof filtros !== 'undefined' && filtros) ? filtros : {};
+
+  const tonalidades = ['project-tone-1', 'project-tone-2', 'project-tone-3', 'project-tone-4', 'project-tone-5', 'project-tone-6'];
+  const projectGroups = [];
+  const groupMap = new Map();
+
+  actividades.forEach((item) => {
+    const proyectoNombre = item.proyecto || 'Sin proyecto';
+    if (!groupMap.has(proyectoNombre)) {
+      const group = {
+        nombre: proyectoNombre,
+        toneClass: tonalidades[projectGroups.length % tonalidades.length],
+        items: []
+      };
+      groupMap.set(proyectoNombre, group);
+      projectGroups.push(group);
+    }
+    groupMap.get(proyectoNombre).items.push(item);
+  });
+%>
+
+<section class="module-print-report print-only" aria-hidden="true">
+  <div class="module-print-banner">
+    <div class="module-print-brand">
+      <div class="module-print-logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64" role="img" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="14" fill="#0f172a"></rect>
+          <path d="M18 44V20h8l6 8 6-8h8v24h-8V33l-6 8-6-8v11h-8z" fill="#f8fafc"></path>
+          <rect x="12" y="48" width="40" height="5" rx="2.5" fill="#d4a017"></rect>
+        </svg>
+      </div>
+      <div>
+        <p class="module-print-company">Cismining</p>
+        <p class="module-print-system">ERP Construcción</p>
+      </div>
+    </div>
+    <div class="module-print-docmeta">
+      <span>DOC-ACTIVIDADES</span>
+      <strong>Version 1.0</strong>
+    </div>
+  </div>
+  <div class="module-print-head">
+    <div>
+      <p class="module-print-eyebrow">Documento corporativo</p>
+      <h2>Reporte Oficial de Actividades</h2>
+      <p>Control de tareas, seguimiento y actualizacion de avance por proyecto.</p>
+    </div>
+    <div class="module-print-meta-right">
+      <div><strong>Emitido:</strong> <%= fmtFecha(fechaReporte) %></div>
+      <div><strong>Preparado por:</strong> <%= currentUser?.nombre || 'Sistema' %></div>
+      <div><strong>Total registros:</strong> <%= actividadesTotal %></div>
+    </div>
+  </div>
+
+  <div class="module-print-metrics">
+    <article><span>Total tareas</span><strong><%= actividadesTotal %></strong></article>
+    <article><span>Completadas</span><strong><%= actividadesCompletadas %></strong></article>
+    <article><span>En proceso</span><strong><%= actividadesProceso %></strong></article>
+    <article><span>Avance promedio</span><strong><%= actividadesAvanceProm.toFixed(1) %>%</strong></article>
+  </div>
+
+  <% if (!projectGroups.length) { %>
+    <table class="table table-sm module-print-table">
+      <tbody>
+        <tr><td class="text-center">No hay actividades registradas.</td></tr>
+      </tbody>
+    </table>
+  <% } %>
+
+  <% projectGroups.forEach((group) => { %>
+    <section class="module-project-block">
+      <div class="module-project-heading <%= group.toneClass %>">
+        <span><%= group.nombre %></span>
+        <strong><%= group.items.length %> actividades</strong>
+      </div>
+      <table class="table table-sm module-print-table">
+        <thead>
+          <tr>
+            <th>Codigo</th>
+            <th>Actividad</th>
+            <th>Partida</th>
+            <th>Prioridad</th>
+            <th>Estado</th>
+            <th>Avance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% group.items.forEach((item) => { %>
+            <tr>
+              <td><%= item.codigo %></td>
+              <td><%= item.nombre %></td>
+              <td><%= item.partida || '-' %></td>
+              <td><%= item.prioridad || '-' %></td>
+              <td><%= item.estado || '-' %></td>
+              <td><strong><%= Number(item.avance_porcentaje || 0).toFixed(1) %>%</strong></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+  <% }) %>
+
+  <div class="module-print-footer">
+    <div>
+      <span class="label">Preparado por:</span>
+      <strong><%= currentUser?.nombre || 'Sistema' %></strong>
+    </div>
+    <div>
+      <span class="label">Clasificacion:</span>
+      <strong>Uso Interno - Gestion de Proyecto</strong>
+    </div>
+  </div>
+</section>
+
+<div class="form-section no-print mb-3">
+  <div class="form-section-title"><i class="bi bi-funnel"></i> Filtros de actividades</div>
+  <div class="form-section-body">
+    <form method="get" action="/actividades" class="row g-2 align-items-end" id="filtroActividadesForm">
+      <div class="col-md-5">
+        <label class="form-label">Proyecto</label>
+        <select name="proyecto_id" class="form-select" id="filtroProyectoActividades">
+          <option value="0">Todos los proyectos</option>
+          <% proyectosListado.forEach((p) => { %>
+            <option value="<%= p.id %>" <%= Number(filtrosAplicados.proyecto_id || 0) === Number(p.id) ? 'selected' : '' %>><%= p.nombre %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label">Codigo</label>
+        <input id="filtroCodigoActividades" name="codigo" class="form-control" placeholder="ACT-00000001" value="<%= filtrosAplicados.codigo || '' %>">
+      </div>
+      <div class="col-md-2 d-grid">
+        <button class="btn btn-primary"><i class="bi bi-search"></i></button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="panel-card no-print">
+  <div class="panel-card-header">
+    <div class="panel-title"><i class="bi bi-list-check"></i> Listado de actividades</div>
+    <span class="badge badge-secondary"><%= actividades.length %> registros</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle table-hover">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Actividad</th>
+          <th>Proyecto</th>
+          <th>Partida</th>
+          <th>Prioridad</th>
+          <th>Estado</th>
+          <th>Avance</th>
+          <th>Actualizar</th>
+          <% if (currentUser.role === 'admin') { %><th>Acciones</th><% } %>
+        </tr>
+      </thead>
+      <tbody>
+        <% const colSpan = currentUser.role === 'admin' ? 9 : 8; %>
+        <% projectGroups.forEach((group, groupIndex) => { %>
+          <tr class="project-divider-row <%= group.toneClass %>" data-group-key="<%= groupIndex %>" data-proyecto-nombre="<%= group.nombre %>">
+            <td colspan="<%= colSpan %>">
+              <div class="project-divider-content">
+                <span class="project-divider-dot"></span>
+                <strong><%= group.nombre %></strong>
+                <span class="project-divider-count"><%= group.items.length %> actividades</span>
+              </div>
+            </td>
+          </tr>
+
+          <% group.items.forEach((item) => { %>
+            <tr
+              class="actividad-row"
+              data-group-key="<%= groupIndex %>"
+              data-proyecto-id="<%= item.proyecto_id || '' %>"
+              data-proyecto-nombre="<%= group.nombre %>"
+              data-codigo="<%= item.codigo || '' %>"
+            >
+              <td>
+                <span class="badge badge-primary" style="font-family:monospace;font-size:.72rem">
+                  <%= item.codigo %>
+                </span>
+              </td>
+              <td>
+                <div class="fw-semibold" style="font-size:.87rem"><%= item.nombre %></div>
+                <% if (item.descripcion) { %>
+                  <div class="text-muted" style="font-size:.77rem"><%= item.descripcion %></div>
+                <% } %>
+              </td>
+              <td style="color:var(--muted);font-size:.83rem"><%= item.proyecto || '—' %></td>
+              <td><span style="font-family:monospace;font-size:.78rem;color:var(--muted)"><%= item.partida || '—' %></span></td>
+              <td>
+                <span class="rounded-badge
+                  <% if(item.prioridad==='Alta') { %>estado-activo<% } else if(item.prioridad==='Media') { %>estado-pendiente<% } else { %>estado-inactivo<% } %>">
+                  <%= item.prioridad %>
+                </span>
+              </td>
+              <td>
+                <span class="rounded-badge estado-<%= (item.estado||'').toLowerCase().replace(/\s+/g,'-') %>">
+                  <%= item.estado %>
+                </span>
+              </td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress" style="min-width:50px;width:70px">
+                    <div class="progress-bar" data-avance="<%= item.avance_porcentaje %>"></div>
+                  </div>
+                  <small style="color:var(--muted)"><%= item.avance_porcentaje %>%</small>
+                </div>
+              </td>
+              <td>
+                <form action="/actividades/<%= item.id %>/estado" method="post" class="d-flex gap-1" style="min-width:220px">
+                  <select name="estado" class="form-select form-select-sm" style="font-size:.78rem">
+                    <% ['Pendiente','En proceso','Observada','Completada'].forEach((st) => { %>
+                      <option value="<%= st %>" <%= item.estado === st ? 'selected' : '' %>><%= st %></option>
+                    <% }) %>
+                  </select>
+                  <input type="number" name="avance_porcentaje" class="form-control form-control-sm"
+                         value="<%= item.avance_porcentaje %>" min="0" max="100" style="width:62px;font-size:.78rem">
+                  <button class="btn btn-xs btn-primary"><i class="bi bi-check"></i></button>
+                </form>
+              </td>
+              <% if (currentUser.role === 'admin') { %>
+                <td>
+                  <div class="d-flex gap-1">
+                    <a href="/actividades/<%= item.id %>/editar" class="btn btn-xs btn-primary" title="Editar">
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                    <form action="/actividades/<%= item.id %>?_method=DELETE" method="post"
+                          onsubmit="return confirm('¿Eliminar esta actividad?')">
+                      <button type="submit" class="btn btn-xs btn-outline-danger" title="Eliminar">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              <% } %>
+            </tr>
+          <% }) %>
+        <% }) %>
+
+        <% if (!actividades.length) { %>
+          <tr><td colspan="<%= colSpan %>"><div class="empty-state"><i class="bi bi-list-check"></i><p>No hay actividades registradas</p></div></td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.progress-bar[data-avance]').forEach((bar) => {
+    const avance = Number(bar.dataset.avance || 0);
+    bar.style.width = Math.max(0, Math.min(100, avance)) + '%';
+  });
+
+  const formFiltrosActividades = document.getElementById('filtroActividadesForm');
+  const filtroProyectoActividades = document.getElementById('filtroProyectoActividades');
+  const filtroCodigoActividades = document.getElementById('filtroCodigoActividades');
+
+  function poblarProyectosDesdeTablaSiHaceFalta() {
+    if (!filtroProyectoActividades) return;
+    if (filtroProyectoActividades.options.length > 1) return;
+
+    const nombres = new Set();
+    document.querySelectorAll('tr.project-divider-row[data-proyecto-nombre]').forEach((row) => {
+      const nombre = (row.dataset.proyectoNombre || '').trim();
+      if (nombre) nombres.add(nombre);
+    });
+
+    [...nombres].sort((a, b) => a.localeCompare(b, 'es')).forEach((nombre) => {
+      const option = document.createElement('option');
+      option.value = `name:${nombre}`;
+      option.textContent = nombre;
+      filtroProyectoActividades.appendChild(option);
+    });
+  }
+
+  function aplicarFiltrosEnTabla() {
+    if (!filtroProyectoActividades) return;
+
+    const selectedProyecto = String(filtroProyectoActividades.value || '0');
+    const codigoFiltro = String((filtroCodigoActividades && filtroCodigoActividades.value) || '').trim().toUpperCase();
+    const rows = document.querySelectorAll('tr.actividad-row');
+    const visiblesPorGrupo = new Map();
+
+    rows.forEach((row) => {
+      const proyectoId = String(row.dataset.proyectoId || '');
+      const proyectoNombre = String(row.dataset.proyectoNombre || '');
+      const codigo = String(row.dataset.codigo || '').toUpperCase();
+      const groupKey = String(row.dataset.groupKey || '');
+
+      const matchProyecto = (
+        selectedProyecto === '0' ||
+        selectedProyecto === '' ||
+        selectedProyecto === proyectoId ||
+        selectedProyecto === `name:${proyectoNombre}`
+      );
+      const matchCodigo = !codigoFiltro || codigo.includes(codigoFiltro);
+      const visible = matchProyecto && matchCodigo;
+
+      row.style.display = visible ? '' : 'none';
+      if (visible) {
+        visiblesPorGrupo.set(groupKey, (visiblesPorGrupo.get(groupKey) || 0) + 1);
+      }
+    });
+
+    document.querySelectorAll('tr.project-divider-row[data-group-key]').forEach((divider) => {
+      const key = String(divider.dataset.groupKey || '');
+      const visible = (visiblesPorGrupo.get(key) || 0) > 0;
+      divider.style.display = visible ? '' : 'none';
+    });
+  }
+
+  poblarProyectosDesdeTablaSiHaceFalta();
+
+  if (formFiltrosActividades) {
+    formFiltrosActividades.addEventListener('submit', (event) => {
+      event.preventDefault();
+      aplicarFiltrosEnTabla();
+    });
+  }
+
+  if (filtroProyectoActividades) {
+    filtroProyectoActividades.addEventListener('change', aplicarFiltrosEnTabla);
+  }
+
+  if (filtroCodigoActividades) {
+    filtroCodigoActividades.addEventListener('input', aplicarFiltrosEnTabla);
+  }
+
+  aplicarFiltrosEnTabla();
+
+  function exportarModuloPDF() {
+    window.print();
+  }
+</script>

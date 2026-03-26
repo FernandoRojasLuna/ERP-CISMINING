@@ -1,0 +1,401 @@
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Planeamiento Gantt</h1>
+    <p>Cronograma visual de tareas por proyecto</p>
+  </div>
+  <div class="d-flex align-items-center gap-2 no-print">
+    <button type="button" class="btn btn-export-pdf" id="btnExportPdf" onclick="exportarGanttPDF()">
+      <i class="bi bi-filetype-pdf"></i> Exportar a PDF
+    </button>
+  </div>
+</div>
+
+<%
+  const proyectoSeleccionado = proyectos.find((p) => Number(p.id) === Number(proyectoId));
+  const nombreProyecto = proyectoSeleccionado?.nombre || 'Todos los proyectos';
+  const totalTareas = ganttItems.length;
+  const tareasCompletadas = ganttItems.filter((item) => (item.estado || '').toLowerCase() === 'completada').length;
+  const tareasEnProceso = ganttItems.filter((item) => (item.estado || '').toLowerCase() === 'en proceso').length;
+  const avancePromedio = totalTareas ? (ganttItems.reduce((acc, item) => acc + Number(item.avance || 0), 0) / totalTareas) : 0;
+
+  const fechaHoy = new Date();
+  const fmt = (date) => {
+    if (!date) return '-';
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+  const fmtNoDash = (date) => {
+    if (!date) return '-';
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+%>
+
+<section class="gantt-print-report print-only" aria-hidden="true">
+  <div class="gantt-print-banner">
+    <div class="gantt-print-brand">
+      <div class="gantt-print-logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64" role="img" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="14" fill="#0f172a"></rect>
+          <path d="M18 44V20h8l6 8 6-8h8v24h-8V33l-6 8-6-8v11h-8z" fill="#f8fafc"></path>
+          <rect x="12" y="48" width="40" height="5" rx="2.5" fill="#d4a017"></rect>
+        </svg>
+      </div>
+      <div>
+        <p class="gantt-print-company">Cismining</p>
+        <p class="gantt-print-sector">ERP Construcción</p>
+      </div>
+    </div>
+    <div class="gantt-print-doccode">
+      <span>DOC-PLAN-GANTT</span>
+      <strong>Versión 1.0</strong>
+    </div>
+  </div>
+
+  <div class="gantt-print-report__head">
+    <div>
+      <p class="gantt-print-report__eyebrow">Documento Corporativo</p>
+      <h2>Reporte Oficial de Planeamiento Gantt</h2>
+      <p class="gantt-print-subtitle">Seguimiento integral de cronograma, responsables y avance por actividad.</p>
+    </div>
+    <div class="gantt-print-report__meta">
+      <div><strong>Proyecto:</strong> <%= nombreProyecto %></div>
+      <div><strong>Emitido:</strong> <%= fmtNoDash(fechaHoy) %></div>
+      <div><strong>Ventana:</strong> <%= fmt(timelineStart) %> &rarr; <%= fmt(timelineEnd) %></div>
+    </div>
+  </div>
+
+  <div class="gantt-print-kpis">
+    <article class="gantt-print-kpi">
+      <span>Total tareas</span>
+      <strong><%= totalTareas %></strong>
+    </article>
+    <article class="gantt-print-kpi">
+      <span>Completadas</span>
+      <strong><%= tareasCompletadas %></strong>
+    </article>
+    <article class="gantt-print-kpi">
+      <span>En proceso</span>
+      <strong><%= tareasEnProceso %></strong>
+    </article>
+    <article class="gantt-print-kpi">
+      <span>Avance promedio</span>
+      <strong><%= avancePromedio.toFixed(1) %>%</strong>
+    </article>
+  </div>
+
+  <table class="table table-sm gantt-print-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Tarea</th>
+        <th>Responsable</th>
+        <th>Estado</th>
+        <th>Avance</th>
+        <th>Inicio</th>
+        <th>Fin</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!ganttItems.length) { %>
+        <tr>
+          <td colspan="7" class="text-center text-muted py-3">No hay tareas registradas para este proyecto.</td>
+        </tr>
+      <% } %>
+      <% ganttItems.forEach((item, idx) => { %>
+        <tr>
+          <td><%= idx + 1 %></td>
+          <td><%= item.nombre %></td>
+          <td><%= item.responsable || 'Sin responsable' %></td>
+          <td>
+            <span class="gantt-print-status status-<%= (item.estado || '').toLowerCase().replace(/\s+/g, '-') %>">
+              <%= item.estado %>
+            </span>
+          </td>
+          <td><strong><%= Number(item.avance || 0).toFixed(1) %>%</strong></td>
+          <td><%= fmt(item.fecha_inicio) %></td>
+          <td><%= fmt(item.fecha_fin) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <div class="gantt-print-footer">
+    <div>
+      <span class="label">Preparado por:</span>
+      <strong><%= currentUser?.nombre || 'Sistema' %></strong>
+    </div>
+    <div>
+      <span class="label">Clasificación:</span>
+      <strong>Uso Interno - Gestión de Proyecto</strong>
+    </div>
+  </div>
+</section>
+
+<div class="row g-3 mb-4 no-print">
+  <div class="col-lg-8">
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-calendar-range"></i> Cronograma del proyecto</div>
+        <form class="d-flex gap-2 no-print" method="get" action="/gantt" id="formFiltroProyecto">
+          <select id="filtroProyecto" name="proyecto_id" class="form-select" style="min-width:200px;font-size:.83rem">
+            <% proyectos.forEach(p => { %>
+              <option value="<%= p.id %>" <%= Number(proyectoId) === Number(p.id) ? 'selected' : '' %>>
+                <%= p.nombre %>
+              </option>
+            <% }) %>
+          </select>
+          <button type="submit" class="btn btn-primary btn-sm" style="min-width:100px">
+            <i class="bi bi-funnel"></i> Filtrar
+          </button>
+        </form>
+      </div>
+      <div class="panel-body">
+        <div class="gantt-wrapper">
+          <% if (!ganttItems.length) { %>
+            <div class="empty-state"><i class="bi bi-calendar-x"></i><p>No hay tareas en el cronograma para este proyecto</p></div>
+          <% } %>
+          <% ganttItems.forEach((item, idx) => { %>
+            <div class="gantt-row">
+              <div class="gantt-meta">
+                <div class="fw-semibold" style="font-size:.87rem"><%= item.nombre %></div>
+                <div class="text-muted" style="font-size:.76rem">
+                  <%= item.responsable || 'Sin responsable' %> &middot;
+                  <span class="rounded-badge estado-<%= (item.estado||'').toLowerCase().replace(/\s+/g,'-') %>" style="font-size:.68rem;padding:1px 7px">
+                    <%= item.estado %>
+                  </span>
+                  &middot; <%= item.avance %>%
+                </div>
+              </div>
+              <div class="gantt-track">
+                <div
+                  class="gantt-bar"
+                  data-offset="<%= item.offsetPct %>"
+                  data-width="<%= Math.max(item.widthPct, 4) %>"
+                  data-id="<%= item.id %>"
+                  data-nombre="<%= (item.nombre || '').replace(/"/g, '&quot;') %>"
+                  data-proyecto-id="<%= item.proyecto_id %>"
+                  data-responsable-id="<%= item.responsable_id || '' %>"
+                  data-fecha-inicio="<%= item.fecha_inicio ? item.fecha_inicio.toISOString().split('T')[0] : '' %>"
+                  data-fecha-fin="<%= item.fecha_fin ? item.fecha_fin.toISOString().split('T')[0] : '' %>"
+                  data-avance="<%= item.avance || 0 %>"
+                  data-estado="<%= item.estado || '' %>"
+                >
+                  <span><%= item.fecha_inicio?.toISOString().slice(0,10) %> → <%= item.fecha_fin?.toISOString().slice(0,10) %></span>
+                  <button type="button" class="btn-gantt-edit" onclick="abrirEdicionTarea(this)" title="Editar">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="form-section no-print">
+      <div class="form-section-title"><i id="iconoFormulario" class="bi bi-plus-circle"></i> <span id="tituloFormulario">Nueva tarea del Gantt</span></div>
+      <div class="form-section-body">
+        <% if (currentUser.role === 'admin') { %>
+        <form id="formularioTarea" class="row g-3">
+          <input type="hidden" id="tareaId">
+          <div class="col-12">
+            <label class="form-label">Proyecto</label>
+            <select id="campProyecto" name="proyecto_id" class="form-select" required>
+              <% proyectos.forEach(p => { %><option value="<%= p.id %>"><%= p.nombre %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Nombre de la tarea</label>
+            <input id="campNombre" name="nombre" class="form-control" required placeholder="Descripción de la tarea">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Responsable</label>
+            <select id="campResponsable" name="responsable_id" class="form-select">
+              <option value="">Sin responsable</option>
+              <% empleados.forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Fecha inicio</label>
+            <input id="campFechaInicio" type="date" name="fecha_inicio" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Fecha fin</label>
+            <input id="campFechaFin" type="date" name="fecha_fin" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Avance %</label>
+            <input id="campAvance" name="avance" type="number" min="0" max="100" class="form-control" value="0">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Estado</label>
+            <select id="campEstado" name="estado" class="form-select">
+              <option>Programada</option>
+              <option>En proceso</option>
+              <option>Completada</option>
+            </select>
+          </div>
+          <div class="col-12 d-flex gap-2">
+            <button type="submit" id="btnGuardar" class="btn btn-primary">
+              <i class="bi bi-check-lg"></i> Guardar tarea
+            </button>
+            <button type="button" id="btnEliminar" class="btn btn-outline-danger" style="display:none;">
+              <i class="bi bi-trash"></i> Eliminar tarea
+            </button>
+            <button type="button" id="btnCancelar" class="btn btn-outline-secondary" style="display:none;" onclick="cancelarEdicion()">
+              <i class="bi bi-x-lg"></i> Cancelar
+            </button>
+          </div>
+        </form>
+        <% } else { %>
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            Solo el administrador puede crear o modificar tareas del Gantt.
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Variables globales
+  let tareasEnEdicion = null;
+
+  // Posicionar barras Gantt
+  document.querySelectorAll('.gantt-bar').forEach((bar) => {
+    const left = Number(bar.dataset.offset || 0);
+    const width = Number(bar.dataset.width || 4);
+    bar.style.left = left + '%';
+    bar.style.width = width + '%';
+  });
+
+  // Filtro automático al cambiar proyecto
+  document.getElementById('filtroProyecto').addEventListener('change', function() {
+    // Enviar el formulario automáticamente
+    document.getElementById('formFiltroProyecto').submit();
+  });
+
+  // Abrir edición de tarea desde el botón lápiz
+  function abrirEdicionTarea(btn) {
+    event.stopPropagation();
+    const bar = btn.parentElement;
+    const id = bar.dataset.id;
+    const nombre = bar.dataset.nombre;
+    const proyectoId = bar.dataset.proyectoId;
+    const responsableId = bar.dataset.responsableId;
+    const fechaInicio = bar.dataset.fechaInicio;
+    const fechaFin = bar.dataset.fechaFin;
+    const avance = bar.dataset.avance;
+    const estado = bar.dataset.estado;
+
+    // Llenar formulario
+    document.getElementById('tareaId').value = id;
+    document.getElementById('campNombre').value = nombre;
+    document.getElementById('campProyecto').value = proyectoId;
+    document.getElementById('campResponsable').value = responsableId;
+    document.getElementById('campFechaInicio').value = fechaInicio;
+    document.getElementById('campFechaFin').value = fechaFin;
+    document.getElementById('campAvance').value = avance;
+    document.getElementById('campEstado').value = estado;
+
+    // Cambiar modo a edición
+    tareasEnEdicion = id;
+    document.getElementById('iconoFormulario').className = 'bi bi-pencil';
+    document.getElementById('tituloFormulario').textContent = 'Editar tarea del Gantt';
+    document.getElementById('btnGuardar').textContent = '✓ Actualizar tarea';
+    document.getElementById('btnGuardar').classList.add('btn-warning');
+    document.getElementById('btnEliminar').style.display = 'inline-block';
+    document.getElementById('btnCancelar').style.display = 'inline-block';
+  }
+
+  // Cancelar edición
+  function cancelarEdicion() {
+    tareasEnEdicion = null;
+    document.getElementById('formularioTarea').reset();
+    document.getElementById('tareaId').value = '';
+    document.getElementById('iconoFormulario').className = 'bi bi-plus-circle';
+    document.getElementById('tituloFormulario').textContent = 'Nueva tarea del Gantt';
+    document.getElementById('btnGuardar').textContent = '✓ Guardar tarea';
+    document.getElementById('btnGuardar').classList.remove('btn-warning');
+    document.getElementById('btnEliminar').style.display = 'none';
+    document.getElementById('btnCancelar').style.display = 'none';
+  }
+
+  // Enviar formulario
+  document.getElementById('formularioTarea').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const datos = {
+      proyecto_id: document.getElementById('campProyecto').value,
+      nombre: document.getElementById('campNombre').value,
+      responsable_id: document.getElementById('campResponsable').value,
+      fecha_inicio: document.getElementById('campFechaInicio').value,
+      fecha_fin: document.getElementById('campFechaFin').value,
+      avance: document.getElementById('campAvance').value,
+      estado: document.getElementById('campEstado').value
+    };
+
+    const url = tareasEnEdicion ? `/gantt/${tareasEnEdicion}` : '/gantt';
+    const method = tareasEnEdicion ? 'PUT' : 'POST';
+
+    try {
+      let response;
+      if (tareasEnEdicion) {
+        // AJAX para PUT
+        response = await fetch(url, {
+          method: method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(datos)
+        });
+      } else {
+        // Envío tradicional POST para crear
+        const formData = new FormData();
+        Object.entries(datos).forEach(([key, value]) => formData.append(key, value));
+        response = await fetch(url, {
+          method: 'POST',
+          body: new URLSearchParams(Object.entries(datos))
+        });
+      }
+
+      if (response.ok) {
+        // Recargar página después de 500ms
+        setTimeout(() => window.location.reload(), 500);
+      } else {
+        alert('Error al guardar la tarea.');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al procesar la solicitud.');
+    }
+  });
+
+  // Eliminar tarea
+  document.getElementById('btnEliminar').addEventListener('click', async function() {
+    if (!tareasEnEdicion) return;
+    if (!confirm('¿Estás seguro de que deseas eliminar esta tarea?')) return;
+
+    try {
+      const response = await fetch(`/gantt/${tareasEnEdicion}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        setTimeout(() => window.location.reload(), 500);
+      } else {
+        alert('Error al eliminar la tarea.');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al procesar la solicitud.');
+    }
+  });
+
+  function exportarGanttPDF() {
+    window.print();
+  }
+</script>

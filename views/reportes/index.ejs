@@ -1,0 +1,382 @@
+<%
+  const fechaReporte = new Date();
+  const fmtFecha = (date) => {
+    if (!date) return '-';
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+  const proyectoLabel = filtros?.proyecto_id
+    ? ((proyectos || []).find((p) => String(p.id) === String(filtros.proyecto_id))?.nombre || 'Seleccionado')
+    : 'Todos';
+  const totalCostos = Number(resumen?.costoTotal || 0);
+%>
+
+<section class="module-print-report reportes-print-report print-only" aria-hidden="true">
+  <div class="module-print-banner">
+    <div class="module-print-brand">
+      <div class="module-print-logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64" role="img" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="14" fill="#0f172a"></rect>
+          <path d="M18 44V20h8l6 8 6-8h8v24h-8V33l-6 8-6-8v11h-8z" fill="#f8fafc"></path>
+          <rect x="12" y="48" width="40" height="5" rx="2.5" fill="#d4a017"></rect>
+        </svg>
+      </div>
+      <div>
+        <p class="module-print-company">Cismining</p>
+        <p class="module-print-system">ERP Construcción</p>
+      </div>
+    </div>
+    <div class="module-print-docmeta">
+      <span>DOC-REPORTES</span>
+      <strong>Version 1.0</strong>
+    </div>
+  </div>
+
+  <div class="module-print-head">
+    <div>
+      <p class="module-print-eyebrow">Documento corporativo</p>
+      <h2>Centro de Reportes - Resumen Ejecutivo</h2>
+      <p>Consolidado de avances, costos y nómina para control gerencial.</p>
+    </div>
+    <div class="module-print-meta-right">
+      <div><strong>Emitido:</strong> <%= fmtFecha(fechaReporte) %></div>
+      <div><strong>Periodo:</strong> <%= fmtFecha(filtros?.desde) %> a <%= fmtFecha(filtros?.hasta) %></div>
+      <div><strong>Proyecto:</strong> <%= proyectoLabel %></div>
+    </div>
+  </div>
+
+  <div class="module-print-metrics">
+    <article><span>Avance global</span><strong><%= resumen?.avanceGlobal || 0 %>%</strong></article>
+    <article><span>Actividades</span><strong><%= resumen?.totalActividades || 0 %></strong></article>
+    <article><span>Costo ejecutado</span><strong>S/ <%= Number(resumen?.costoTotal || 0).toFixed(2) %></strong></article>
+    <article><span>Nómina actual</span><strong>S/ <%= Number(resumen?.nominaActual || 0).toFixed(2) %></strong></article>
+  </div>
+
+  <section class="module-print-section">
+    <p class="module-print-subtable-title">Comparativos Ejecutivos</p>
+    <table class="table table-sm module-print-table module-print-table-cols-3">
+      <thead>
+        <tr>
+          <th>Indicador</th>
+          <th>Vs mes anterior</th>
+          <th>Vs año anterior</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Costo ejecutado</td>
+          <td><strong><%= Number(resumen?.variacionCostoMoMPct || 0).toFixed(2) %>%</strong></td>
+          <td><strong><%= Number(resumen?.variacionCostoYoYPct || 0).toFixed(2) %>%</strong></td>
+        </tr>
+        <tr>
+          <td>Nómina</td>
+          <td><strong><%= Number(resumen?.variacionNominaPct || 0).toFixed(2) %>%</strong></td>
+          <td><strong><%= Number(resumen?.variacionNominaYoYPct || 0).toFixed(2) %>%</strong></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="module-print-section">
+    <p class="module-print-subtable-title">Avance por Proyecto</p>
+    <table class="table table-sm module-print-table module-print-table-cols-3">
+      <thead>
+        <tr>
+          <th>Proyecto</th>
+          <th>Actividades</th>
+          <th>Avance %</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!Array.isArray(avancePorProyecto) || !avancePorProyecto.length) { %>
+          <tr><td colspan="3" class="text-center">Sin datos de avance para el periodo.</td></tr>
+        <% } %>
+        <% (avancePorProyecto || []).forEach((row) => { %>
+          <tr>
+            <td><%= row.nombre %></td>
+            <td><%= row.actividades %></td>
+            <td><strong><%= Number(row.avance_promedio || 0).toFixed(2) %>%</strong></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="module-print-section">
+    <p class="module-print-subtable-title">Costos por Categoria</p>
+    <table class="table table-sm module-print-table module-print-table-cols-3">
+      <thead>
+        <tr>
+          <th>Categoria</th>
+          <th>Monto (S/)</th>
+          <th>Participacion</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!Array.isArray(costosPorCategoria) || !costosPorCategoria.length) { %>
+          <tr><td colspan="3" class="text-center">Sin costos registrados para el periodo.</td></tr>
+        <% } %>
+        <% (costosPorCategoria || []).forEach((row) => { %>
+          <tr>
+            <td><%= row.categoria %></td>
+            <td><strong><%= Number(row.total || 0).toFixed(2) %></strong></td>
+            <td><%= totalCostos ? ((Number(row.total || 0) / totalCostos) * 100).toFixed(1) : '0.0' %>%</td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="module-print-section">
+    <p class="module-print-subtable-title">Nómina por Periodo</p>
+    <table class="table table-sm module-print-table">
+      <thead>
+        <tr>
+          <th>Periodo</th>
+          <th>Total nómina (S/)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!Array.isArray(nominaResumen) || !nominaResumen.length) { %>
+          <tr><td colspan="2" class="text-center">Sin datos de nómina para el periodo.</td></tr>
+        <% } %>
+        <% (nominaResumen || []).forEach((row) => { %>
+          <tr>
+            <td><%= row.periodo %></td>
+            <td><strong><%= Number(row.total_nomina || 0).toFixed(2) %></strong></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="module-print-footer">
+    <div>
+      <span class="label">Documento:</span>
+      <strong>Centro de Reportes</strong>
+    </div>
+    <div>
+      <span class="label">Clasificacion:</span>
+      <strong>Uso Interno - Gerencia</strong>
+    </div>
+  </div>
+</section>
+
+<div class="no-print">
+<div class="page-header mb-3">
+  <div class="page-header-title">
+    <h1>Centro de Reportes</h1>
+    <p>Visión consolidada de rendimiento operativo, costos y nómina</p>
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    <a href="<%= exportExcelUrl %>" class="btn btn-outline-success">
+      <i class="bi bi-file-earmark-excel"></i> Exportar Excel
+    </a>
+    <button type="button" class="btn btn-export-pdf" onclick="exportarReportePDF()">
+      <i class="bi bi-filetype-pdf"></i> Exportar PDF
+    </button>
+    <div class="reportes-header-chip">
+      <i class="bi bi-shield-check"></i>
+      <span>Tablero ejecutivo</span>
+    </div>
+  </div>
+</div>
+
+<div class="panel-card mb-4 no-print">
+  <div class="panel-card-header">
+    <div class="panel-title"><i class="bi bi-funnel"></i> Filtros Ejecutivos</div>
+  </div>
+  <div class="panel-body">
+    <form action="/reportes" method="get" class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label">Periodo</label>
+        <select name="periodo" class="form-select">
+          <option value="">Personalizado</option>
+          <option value="mes_actual" <%= filtros?.periodo === 'mes_actual' ? 'selected' : '' %>>Mes actual</option>
+          <option value="trimestre_actual" <%= filtros?.periodo === 'trimestre_actual' ? 'selected' : '' %>>Trimestre actual</option>
+          <option value="anio_actual" <%= filtros?.periodo === 'anio_actual' ? 'selected' : '' %>>Año actual</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Desde</label>
+        <input type="date" name="desde" class="form-control" value="<%= filtros?.desde || '' %>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Hasta</label>
+        <input type="date" name="hasta" class="form-control" value="<%= filtros?.hasta || '' %>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Proyecto</label>
+        <select name="proyecto_id" class="form-select">
+          <option value="">Todos los proyectos</option>
+          <% (proyectos || []).forEach((p) => { %>
+            <option value="<%= p.id %>" <%= String(filtros?.proyecto_id || '') === String(p.id) ? 'selected' : '' %>><%= p.nombre %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Aplicar</button>
+        <a href="/reportes" class="btn btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i></a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% if (Array.isArray(alertas) && alertas.length) { %>
+<div class="panel-card mb-4">
+  <div class="panel-card-header">
+    <div class="panel-title"><i class="bi bi-exclamation-triangle"></i> Alertas Corporativas</div>
+  </div>
+  <div class="panel-body">
+    <% alertas.forEach((a) => { %>
+      <div class="alert <%= a.tipo === 'critico' ? 'alert-danger' : 'alert-warning' %> mb-2">
+        <i class="bi <%= a.tipo === 'critico' ? 'bi-slash-circle' : 'bi-exclamation-circle' %>"></i>
+        <div>
+          <strong><%= a.titulo %></strong>
+          <div><%= a.detalle %></div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+</div>
+<% } %>
+
+<div class="reportes-kpi-grid mb-4">
+  <div class="reportes-kpi-card">
+    <span class="reportes-kpi-label">Avance global</span>
+    <div class="reportes-kpi-value"><%= resumen?.avanceGlobal || 0 %>%</div>
+    <small><i class="bi bi-diagram-3"></i> <%= resumen?.totalProyectos || 0 %> proyectos analizados</small>
+  </div>
+  <div class="reportes-kpi-card">
+    <span class="reportes-kpi-label">Actividades evaluadas</span>
+    <div class="reportes-kpi-value"><%= resumen?.totalActividades || 0 %></div>
+    <small><i class="bi bi-list-task"></i> Total de actividades con seguimiento</small>
+  </div>
+  <div class="reportes-kpi-card">
+    <span class="reportes-kpi-label">Costo total ejecutado</span>
+    <div class="reportes-kpi-value">S/ <%= Number(resumen?.costoTotal || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) %></div>
+    <small>
+      <i class="bi bi-pie-chart"></i>
+      Mayor categoría: <%= resumen?.mayorCategoria?.categoria || '—' %>
+    </small>
+    <small>
+      <i class="bi bi-graph-up"></i>
+      Vs mes anterior: <%= Number(resumen?.variacionCostoMoMPct || 0).toFixed(2) %>% | Vs año anterior: <%= Number(resumen?.variacionCostoYoYPct || 0).toFixed(2) %>%
+    </small>
+  </div>
+  <div class="reportes-kpi-card <%= (resumen?.variacionNominaPct || 0) > 0 ? 'warn' : 'ok' %>">
+    <span class="reportes-kpi-label">Nómina actual</span>
+    <div class="reportes-kpi-value">S/ <%= Number(resumen?.nominaActual || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div>
+    <small>
+      <i class="bi bi-graph-up-arrow"></i>
+      Vs mes anterior: <%= Number(resumen?.variacionNominaPct || 0).toFixed(2) %>% | Vs año anterior: <%= Number(resumen?.variacionNominaYoYPct || 0).toFixed(2) %>%
+    </small>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-7">
+    <div class="panel-card h-100">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-bar-chart"></i> Avance por proyecto</div>
+        <span class="badge badge-secondary">% promedio de avance</span>
+      </div>
+      <div class="panel-body report-chart-wrap">
+        <canvas id="avanceProyectoChart"
+          data-labels='<%- JSON.stringify(avancePorProyecto.map(x => x.nombre)) %>'
+          data-values='<%- JSON.stringify(avancePorProyecto.map(x => x.avance_promedio || 0)) %>'></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="panel-card h-100">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-cash-stack"></i> Costos por categoría</div>
+        <span class="badge badge-secondary">egresos acumulados</span>
+      </div>
+      <div class="panel-body report-chart-wrap">
+        <canvas id="costosCategoriaChart"
+          data-labels='<%- JSON.stringify(costosPorCategoria.map(x => x.categoria)) %>'
+          data-values='<%- JSON.stringify(costosPorCategoria.map(x => x.total)) %>'></canvas>
+      </div>
+      <div class="reportes-cost-list">
+        <% costosPorCategoria.slice(0, 4).forEach(c => { %>
+          <div class="reportes-cost-item">
+            <span><%= c.categoria %></span>
+            <strong>
+              <%= totalCostos ? Math.round((Number(c.total || 0) / totalCostos) * 100) : 0 %>%
+            </strong>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function exportarReportePDF() {
+    document.body.classList.add('reportes-print-mode');
+    window.print();
+    window.setTimeout(() => {
+      document.body.classList.remove('reportes-print-mode');
+    }, 200);
+  }
+</script>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-file-earmark-bar-graph"></i> Reporte técnico de avance</div>
+        <span class="badge badge-secondary">detalle operativo</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>Proyecto</th><th>Actividades</th><th>Avance</th></tr></thead>
+          <tbody>
+            <% avancePorProyecto.forEach(r => { %>
+            <tr>
+              <td class="fw-semibold"><%= r.nombre %></td>
+              <td><%= r.actividades %></td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress flex-grow-1"><div class="progress-bar" style="width:<%= r.avance_promedio || 0 %>%"></div></div>
+                  <small class="<%= Number(r.avance_promedio || 0) < 40 ? 'text-danger fw-semibold' : (Number(r.avance_promedio || 0) < 70 ? 'text-warning fw-semibold' : 'text-success fw-semibold') %>"><%= r.avance_promedio || 0 %>%</small>
+                </div>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (!avancePorProyecto.length) { %>
+              <tr><td colspan="3" class="text-center text-muted" style="padding:28px">Sin datos de avance</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="panel-card h-100">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-people"></i> Reporte de nómina</div>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>Período</th><th>Total S/</th></tr></thead>
+          <tbody>
+            <% nominaResumen.forEach(r => { %>
+            <tr>
+              <td><%= r.periodo %></td>
+              <td class="fw-semibold">S/ <%= Number(r.total_nomina).toFixed(2) %></td>
+            </tr>
+            <% }) %>
+            <% if (!nominaResumen.length) { %>
+              <tr><td colspan="2" class="text-center text-muted" style="padding:28px">Sin datos de nómina</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</div>

@@ -1,0 +1,383 @@
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Recursos Humanos</h1>
+    <p>Gestión de usuarios, empleados y nómina del sistema</p>
+  </div>
+  <div class="d-flex align-items-center gap-2 no-print">
+    <% if (currentUser && currentUser.role === 'admin') { %>
+      <a href="/rrhh/usuarios/nuevo" class="btn btn-primary">
+        <i class="bi bi-person-plus"></i> Nuevo Usuario
+      </a>
+    <% } %>
+    <button type="button" class="btn btn-export-pdf" onclick="exportarModuloPDF()">
+      <i class="bi bi-filetype-pdf"></i> Exportar a PDF
+    </button>
+  </div>
+</div>
+
+<%
+  const fechaReporte = new Date();
+  const fechaHoyIso = new Date().toISOString().slice(0, 10);
+  const totalUsuarios = typeof usuarios !== 'undefined' && Array.isArray(usuarios) ? usuarios.length : 0;
+  const usuariosActivos = typeof usuarios !== 'undefined' && Array.isArray(usuarios)
+    ? usuarios.filter((u) => Number(u.activo) === 1).length
+    : 0;
+  const totalEmpleados = typeof empleados !== 'undefined' && Array.isArray(empleados) ? empleados.length : 0;
+  const totalNomina = typeof nomina !== 'undefined' && Array.isArray(nomina) ? nomina.length : 0;
+  const fmtFecha = (date) => {
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+%>
+
+<section class="module-print-report print-only" aria-hidden="true">
+  <div class="module-print-banner">
+    <div class="module-print-brand">
+      <div class="module-print-logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64" role="img" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="14" fill="#0f172a"></rect>
+          <path d="M18 44V20h8l6 8 6-8h8v24h-8V33l-6 8-6-8v11h-8z" fill="#f8fafc"></path>
+          <rect x="12" y="48" width="40" height="5" rx="2.5" fill="#d4a017"></rect>
+        </svg>
+      </div>
+      <div>
+        <p class="module-print-company">Cismining</p>
+        <p class="module-print-system">ERP Construcción</p>
+      </div>
+    </div>
+    <div class="module-print-docmeta">
+      <span>DOC-RRHH</span>
+      <strong>Version 1.0</strong>
+    </div>
+  </div>
+  <div class="module-print-head">
+    <div>
+      <p class="module-print-eyebrow">Documento corporativo</p>
+      <h2>Reporte Oficial de Recursos Humanos</h2>
+      <p>Gestion de usuarios, empleados activos y resumen de nomina.</p>
+    </div>
+    <div class="module-print-meta-right">
+      <div><strong>Emitido:</strong> <%= fmtFecha(fechaReporte) %></div>
+      <div><strong>Preparado por:</strong> <%= currentUser?.nombre || 'Sistema' %></div>
+      <div><strong>Usuarios:</strong> <%= totalUsuarios %></div>
+    </div>
+  </div>
+
+  <div class="module-print-metrics">
+    <article><span>Usuarios</span><strong><%= totalUsuarios %></strong></article>
+    <article><span>Usuarios activos</span><strong><%= usuariosActivos %></strong></article>
+    <article><span>Empleados</span><strong><%= totalEmpleados %></strong></article>
+    <article><span>Reg. nomina</span><strong><%= totalNomina %></strong></article>
+  </div>
+
+  <table class="table table-sm module-print-table">
+    <thead>
+      <tr>
+        <th>Usuario</th>
+        <th>Rol</th>
+        <th>Nombre completo</th>
+        <th>Cargo</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!(typeof usuarios !== 'undefined' && usuarios && usuarios.length)) { %>
+        <tr><td colspan="5" class="text-center">No hay usuarios registrados.</td></tr>
+      <% } %>
+      <% if (typeof usuarios !== 'undefined' && usuarios && usuarios.length) { %>
+        <% usuarios.forEach((u) => { %>
+          <tr>
+            <td><%= u.username %></td>
+            <td><%= u.role %></td>
+            <td><%= u.empleado_nombre || '-' %></td>
+            <td><%= u.cargo || '-' %></td>
+            <td><%= Number(u.activo) === 1 ? 'Activo' : 'Inactivo' %></td>
+          </tr>
+        <% }) %>
+      <% } %>
+    </tbody>
+  </table>
+
+  <h3 class="module-print-subtable-title">Resumen de nomina</h3>
+  <table class="table table-sm module-print-table">
+    <thead>
+      <tr>
+        <th>Empleado</th>
+        <th>Fecha</th>
+        <th>Neto (S/)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!(typeof nomina !== 'undefined' && nomina && nomina.length)) { %>
+        <tr><td colspan="3" class="text-center">Sin registros de nomina.</td></tr>
+      <% } %>
+      <% if (typeof nomina !== 'undefined' && nomina && nomina.length) { %>
+        <% nomina.forEach((n) => { %>
+          <tr>
+            <td><%= n.nombre %></td>
+            <td><%= fmtFecha(n.periodo) %></td>
+            <td><strong><%= Number(n.neto_pagar || 0).toFixed(2) %></strong></td>
+          </tr>
+        <% }) %>
+      <% } %>
+    </tbody>
+  </table>
+
+  <div class="module-print-footer">
+    <div>
+      <span class="label">Preparado por:</span>
+      <strong><%= currentUser?.nombre || 'Sistema' %></strong>
+    </div>
+    <div>
+      <span class="label">Clasificacion:</span>
+      <strong>Uso Interno - Gestion de Proyecto</strong>
+    </div>
+  </div>
+</section>
+
+<div class="no-print">
+<% if (currentUser && currentUser.role === 'admin') { %>
+  <% if (typeof message !== 'undefined' && message) { %>
+    <div class="alert alert-success alert-dismissible fade show mb-4">
+      <i class="bi bi-check-circle-fill"></i> <%= message %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  <% } %>
+  <% if (typeof error !== 'undefined' && error) { %>
+    <div class="alert alert-danger alert-dismissible fade show mb-4">
+      <i class="bi bi-exclamation-triangle-fill"></i> <%= error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  <% } %>
+<% } %>
+
+<!-- Tabla de usuarios -->
+<div class="panel-card mb-4">
+  <div class="panel-card-header">
+    <div class="panel-title"><i class="bi bi-people"></i> Usuarios del sistema</div>
+    <span class="badge badge-secondary"><%= typeof usuarios !== 'undefined' ? usuarios.length : 0 %> usuarios</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle table-hover">
+      <thead>
+        <tr>
+          <th>Usuario</th>
+          <th>Rol</th>
+          <th>Nombre completo</th>
+          <th>Cargo</th>
+          <th>Estado</th>
+          <% if (currentUser && currentUser.role === 'admin') { %><th>Acciones</th><% } %>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (typeof usuarios !== 'undefined' && usuarios && usuarios.length > 0) { %>
+          <% usuarios.forEach(u => { %>
+          <tr>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <span class="avatar" style="width:30px;height:30px;font-size:.7rem;background:linear-gradient(135deg,#4f46e5,#2563eb)">
+                  <%= (u.username||'?').slice(0,2).toUpperCase() %>
+                </span>
+                <span class="fw-semibold"><%= u.username %></span>
+              </div>
+            </td>
+            <td>
+              <span class="rounded-badge <%= u.role === 'admin' ? 'estado-activo' : 'estado-pendiente' %>">
+                <i class="bi bi-<%= u.role === 'admin' ? 'shield-check' : 'person' %>"></i>
+                <%= u.role %>
+              </span>
+            </td>
+            <td><%= u.empleado_nombre || '—' %></td>
+            <td style="color:var(--muted);font-size:.83rem"><%= u.cargo || '—' %></td>
+            <td>
+              <span class="rounded-badge <%= u.activo ? 'estado-completado' : 'estado-inactivo' %>">
+                <%= u.activo ? 'Activo' : 'Inactivo' %>
+              </span>
+            </td>
+            <% if (currentUser && currentUser.role === 'admin') { %>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="/rrhh/usuarios/<%= u.id %>/editar" class="btn btn-xs btn-primary" title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <button type="button" class="btn btn-xs btn-outline-danger" title="Desactivar"
+                        onclick="eliminarUsuario(<%= u.id %>, '<%= u.username %>')">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </td>
+            <% } %>
+          </tr>
+          <% }); %>
+        <% } else { %>
+          <tr><td colspan="6"><div class="empty-state"><i class="bi bi-people"></i><p>No hay usuarios registrados</p></div></td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<% if (currentUser && currentUser.role === 'admin') { %>
+<!-- Formulario nómina -->
+<div class="form-section mb-4">
+  <div class="form-section-title"><i class="bi bi-cash-stack"></i> Procesar nómina</div>
+  <div class="form-section-body">
+    <p class="text-muted mb-3" style="font-size:.9rem;">La planilla toma el importe de asistencias del mes de la fecha elegida y descuenta adelantos/descuentos acumulados.</p>
+    <form action="/rrhh/nomina" method="post" class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Empleado</label>
+        <select name="empleado_id" class="form-select" required>
+          <option value="">Selecciona empleado</option>
+          <% if (typeof empleadosActivos !== 'undefined' && Array.isArray(empleadosActivos)) { %>
+            <% empleadosActivos.forEach(e => { %>
+              <option value="<%= e.id %>"><%= e.nombre %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Fecha</label>
+        <input type="date" name="fecha" class="form-control" value="<%= fechaHoyIso %>" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">
+          <i class="bi bi-arrow-left-circle"></i> Adelanto
+        </label>
+        <input type="number" name="adelanto_extra" class="form-control" min="0" step="0.01" value="0" placeholder="0.00">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">
+          <i class="bi bi-arrow-right-circle"></i> Descuentos
+        </label>
+        <input type="number" name="descuentos_extra" class="form-control" min="0" step="0.01" value="0" placeholder="0.00">
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-primary w-100">
+          <i class="bi bi-check-lg"></i> Procesar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+<% } %>
+
+<!-- Tablas de empleados y nómina -->
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-person-badge"></i> Empleados</div>
+        <span class="badge badge-secondary"><%= typeof empleados !== 'undefined' ? empleados.length : 0 %></span>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle table-hover">
+          <thead>
+            <tr><th>Nombre</th><th>Cargo</th><th>Proyecto</th><th>Salario</th><th>Estado</th></tr>
+          </thead>
+          <tbody>
+            <% if (typeof empleados !== 'undefined' && empleados && empleados.length > 0) { %>
+              <% empleados.forEach(e => { %>
+              <tr>
+                <td class="fw-semibold"><%= e.nombre %></td>
+                <td style="color:var(--muted);font-size:.83rem"><%= e.cargo %></td>
+                <td style="color:var(--muted);font-size:.83rem"><%= e.proyecto || '—' %></td>
+                <td class="fw-semibold">S/ <%= e.salario %></td>
+                <td>
+                  <span class="rounded-badge estado-<%= (e.estado||'').toLowerCase() %>">
+                    <%= e.estado %>
+                  </span>
+                </td>
+              </tr>
+              <% }); %>
+            <% } else { %>
+              <tr><td colspan="5"><div class="empty-state"><i class="bi bi-person-badge"></i><p>Sin empleados</p></div></td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-receipt"></i> Última nómina</div>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle" style="font-size: 0.85rem;">
+          <thead>
+            <tr>
+              <th>Empleado</th>
+              <th>Fecha</th>
+              <th title="Adelanto del empleado">
+                <i class="bi bi-arrow-left-circle"></i> Adelanto
+              </th>
+              <th title="Descuentos retenidos">
+                <i class="bi bi-arrow-right-circle"></i> Desc.
+              </th>
+              <th class="fw-bold text-success">Neto S/</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (typeof nomina !== 'undefined' && nomina && nomina.length > 0) { %>
+              <% nomina.forEach(n => { %>
+              <tr>
+                <td class="fw-semibold"><%= n.nombre %></td>
+                <td style="color:var(--muted)"><%= fmtFecha(n.periodo) %></td>
+                <td>
+                  <% if (Number(n.adelanto_detail || 0) > 0) { %>
+                    <span class="badge bg-warning text-dark">
+                      <%= Number(n.adelanto_detail).toFixed(2) %>
+                    </span>
+                  <% } else { %>
+                    <span style="color:var(--muted)">—</span>
+                  <% } %>
+                </td>
+                <td>
+                  <% if (Number(n.descuentos_detail || 0) > 0) { %>
+                    <span class="badge bg-danger">
+                      <%= Number(n.descuentos_detail).toFixed(2) %>
+                    </span>
+                  <% } else { %>
+                    <span style="color:var(--muted)">—</span>
+                  <% } %>
+                </td>
+                <td class="fw-semibold text-success">S/ <%= Number(n.neto_pagar).toFixed(2) %></td>
+              </tr>
+              <% }); %>
+            <% } else { %>
+              <tr><td colspan="5"><div class="empty-state"><i class="bi bi-receipt"></i><p>Sin nóminas</p></div></td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  async function eliminarUsuario(usuarioId, username) {
+    if (!confirm(`¿Estás seguro de que quieres desactivar al usuario "${username}"?`)) return;
+    try {
+      const response = await fetch(`/rrhh/usuarios/${usuarioId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const result = await response.json();
+      if (result.success) {
+        location.reload();
+      } else {
+        alert('Error: ' + result.message);
+      }
+    } catch (error) {
+      alert('Error al desactivar el usuario');
+    }
+  }
+</script>
+</div>
+
+<script>
+  function exportarModuloPDF() {
+    window.print();
+  }
+</script>

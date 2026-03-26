@@ -1,0 +1,234 @@
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Documentos</h1>
+    <p>Gestión documental: informes, planos y actas por proyecto</p>
+  </div>
+</div>
+
+<%
+  const canManageDocs = (typeof canManage !== 'undefined')
+    ? canManage
+    : Boolean(currentUser && (currentUser.role === 'admin' || currentUser.role === 'usuario'));
+  const isAdminDocs = (typeof isAdmin !== 'undefined')
+    ? isAdmin
+    : Boolean(currentUser && currentUser.role === 'admin');
+%>
+
+<div class="row g-3">
+  <% if (canManageDocs) { %>
+  <div class="col-lg-4">
+    <div class="form-section">
+      <div class="form-section-title">
+        <i class="bi <%= editDocumento ? 'bi-pencil-square' : 'bi-file-earmark-plus' %>"></i>
+        <%= editDocumento ? 'Editar documento' : 'Registrar documento' %>
+      </div>
+      <div class="form-section-body">
+        <form action="<%= editDocumento ? '/documentos/' + editDocumento.id + '?_method=PUT' : '/documentos' %>" method="post" enctype="multipart/form-data" class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Proyecto</label>
+            <select name="proyecto_id" class="form-select">
+              <option value="">Sin proyecto</option>
+              <% if (typeof proyectos !== 'undefined' && Array.isArray(proyectos)) { %>
+                <% proyectos.forEach(p => { %>
+                  <option value="<%= p.id %>" <%= Number(editDocumento?.proyecto_id || 0) === Number(p.id) ? 'selected' : '' %>><%= p.nombre %></option>
+                <% }) %>
+              <% } %>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Tipo de documento</label>
+            <input name="tipo" class="form-control" value="<%= editDocumento?.tipo || '' %>" placeholder="Informe, acta, plano..." required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Título</label>
+            <input name="titulo" class="form-control" value="<%= editDocumento?.titulo || '' %>" placeholder="Título del documento" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Responsable</label>
+            <input name="responsable" class="form-control" value="<%= editDocumento?.responsable || '' %>" placeholder="Nombre del responsable" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Fecha del documento</label>
+            <input type="date" name="fecha_documento" class="form-control" value="<%= editDocumento?.fecha_documento ? editDocumento.fecha_documento.toISOString().slice(0,10) : '' %>" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">URL o ruta de referencia</label>
+            <input name="url_referencia" class="form-control" placeholder="https://..." value="<%= editDocumento && editDocumento.url_referencia && !editDocumento.url_referencia.startsWith('/uploads/') ? editDocumento.url_referencia : '' %>">
+            <small class="text-muted">Opcional. Puedes usar un enlace externo o subir un archivo abajo.</small>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Archivo adjunto</label>
+            <input type="file" name="archivo" class="form-control" accept=".pdf,image/png,image/jpeg,image/webp">
+            <small class="text-muted">Formatos permitidos: PDF, JPG, PNG y WEBP. Tamaño máximo: 10 MB.</small>
+          </div>
+          <% if (editDocumento?.url_referencia) { %>
+          <div class="col-12">
+            <div class="alert alert-info py-2 px-3 m-0">
+              <i class="bi bi-info-circle-fill"></i>
+              Referencia actual:
+              <a href="<%= editDocumento.url_referencia %>" target="_blank" class="ms-1"><%= editDocumento.url_referencia %></a>
+            </div>
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" id="mantener_referencia" name="mantener_referencia" value="1" checked>
+              <label class="form-check-label" for="mantener_referencia">Mantener referencia actual si no subo una nueva</label>
+            </div>
+          </div>
+          <% } %>
+          <div class="col-12">
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary">
+                <i class="bi bi-check-lg"></i>
+                <%= editDocumento ? 'Actualizar documento' : 'Guardar documento' %>
+              </button>
+              <% if (editDocumento) { %>
+                <a href="/documentos" class="btn btn-outline-secondary">
+                  <i class="bi bi-x-lg"></i> Cancelar edición
+                </a>
+              <% } %>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="<%= canManageDocs ? 'col-lg-8' : 'col-12' %>">
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-folder2-open"></i> Documentos cargados</div>
+        <span class="badge badge-secondary"><%= documentos.length %> docs</span>
+      </div>
+      <div class="panel-body" style="padding-bottom:10px;">
+        <form method="get" action="/documentos" class="row g-2 align-items-end" id="formFiltrosDoc">
+          <div class="col-md-4">
+            <label class="form-label">Proyecto</label>
+            <select name="proyecto_id" id="filtroProyectoDoc" class="form-select">
+              <option value="">Todos</option>
+              <% proyectos.forEach(p => { %>
+                <option value="<%= p.id %>" <%= String(filtros?.proyecto_id || '') === String(p.id) ? 'selected' : '' %>><%= p.nombre %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Tipo</label>
+            <input type="text" id="filtroTipoDoc" name="tipo" class="form-control" value="<%= filtros?.tipo || '' %>" placeholder="Informe">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Buscar</label>
+            <input type="text" id="filtroBuscarDoc" name="q" class="form-control" value="<%= filtros?.q || '' %>" placeholder="Título, responsable...">
+          </div>
+          <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel"></i> Filtrar</button>
+            <a href="/documentos" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i> Limpiar</a>
+          </div>
+        </form>
+      </div>
+      <div class="table-responsive">
+        <%
+          const documentosPorProyecto = (Array.isArray(documentos) ? documentos : []).reduce((acc, doc) => {
+            const nombreProyecto = (doc.proyecto && String(doc.proyecto).trim()) ? String(doc.proyecto).trim() : 'Sin proyecto';
+            if (!acc[nombreProyecto]) acc[nombreProyecto] = [];
+            acc[nombreProyecto].push(doc);
+            return acc;
+          }, {});
+          const gruposProyecto = Object.keys(documentosPorProyecto).sort((a, b) =>
+            a.localeCompare(b, 'es', { sensitivity: 'base' })
+          );
+        %>
+        <table class="table align-middle table-hover">
+          <thead>
+            <tr><th>Tipo</th><th>Título</th><th>Proyecto</th><th>Responsable</th><th>Fecha</th><th>Ref.</th><% if (canManageDocs) { %><th>Acciones</th><% } %></tr>
+          </thead>
+          <tbody>
+            <% if (!documentos.length) { %>
+              <tr><td colspan="<%= canManageDocs ? 7 : 6 %>"><div class="empty-state"><i class="bi bi-folder2"></i><p>Sin documentos registrados</p></div></td></tr>
+            <% } else { %>
+              <% gruposProyecto.forEach(proyectoNombre => { %>
+                <tr class="table-light">
+                  <td colspan="<%= canManageDocs ? 7 : 6 %>" class="fw-semibold" style="font-size:.82rem; letter-spacing:.4px;">
+                    <i class="bi bi-folder2-open me-1"></i>
+                    <%= proyectoNombre %>
+                    <span class="badge badge-secondary ms-2"><%= documentosPorProyecto[proyectoNombre].length %></span>
+                  </td>
+                </tr>
+                <% documentosPorProyecto[proyectoNombre].forEach(d => { %>
+                <tr>
+                  <td><span class="badge badge-primary" style="font-size:.72rem"><%= d.tipo %></span></td>
+                  <td class="fw-semibold"><%= d.titulo %></td>
+                  <td style="color:var(--muted);font-size:.83rem"><%= d.proyecto || '—' %></td>
+                  <td style="font-size:.83rem"><%= d.responsable %></td>
+                  <td style="font-size:.8rem;white-space:nowrap"><%= d.fecha_documento?.toISOString().slice(0,10) %></td>
+                  <td>
+                    <% if (d.url_referencia) { %>
+                      <a href="<%= d.url_referencia %>" target="_blank" class="btn btn-xs btn-outline-secondary">
+                        <i class="bi <%= d.url_referencia.startsWith('/uploads/') ? 'bi-file-earmark-arrow-down' : 'bi-box-arrow-up-right' %>"></i>
+                        <%= d.url_referencia.startsWith('/uploads/') ? 'Abrir archivo' : 'Ver enlace' %>
+                      </a>
+                    <% } else { %>
+                      <span class="text-muted">—</span>
+                    <% } %>
+                  </td>
+                  <% if (canManageDocs) { %>
+                  <td>
+                    <div class="d-flex gap-1">
+                      <a href="/documentos?edit=<%= d.id %>" class="btn btn-xs btn-outline-secondary" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                      </a>
+                      <% if (isAdminDocs || d.puedeEliminarOperador) { %>
+                        <form action="/documentos/<%= d.id %>?_method=DELETE" method="post" onsubmit="return confirm('¿Eliminar este documento?');" class="m-0">
+                          <button class="btn btn-xs btn-outline-danger" title="Eliminar">
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        </form>
+                      <% } else { %>
+                        <button class="btn btn-xs btn-outline-danger" title="Solo administrador puede eliminar este documento" disabled>
+                          <i class="bi bi-shield-lock"></i>
+                        </button>
+                      <% } %>
+                    </div>
+                  </td>
+                  <% } %>
+                </tr>
+                <% }) %>
+              <% }) %>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Filtro automático en documentos
+  const formFiltrosDoc = document.getElementById('formFiltrosDoc');
+  const filtroProyectoDoc = document.getElementById('filtroProyectoDoc');
+  const filtroTipoDoc = document.getElementById('filtroTipoDoc');
+  const filtroBuscarDoc = document.getElementById('filtroBuscarDoc');
+  let debounceFiltrosDoc = null;
+
+  function enviarFiltrosDoc() {
+    if (!formFiltrosDoc) return;
+    formFiltrosDoc.submit();
+  }
+
+  function aplicarFiltroConDebounce() {
+    if (!formFiltrosDoc) return;
+    clearTimeout(debounceFiltrosDoc);
+    debounceFiltrosDoc = setTimeout(() => {
+      enviarFiltrosDoc();
+    }, 450);
+  }
+
+  // Escuchar cambios en cada campo
+  if (filtroProyectoDoc) {
+    filtroProyectoDoc.addEventListener('change', enviarFiltrosDoc);
+  }
+  if (filtroTipoDoc) {
+    filtroTipoDoc.addEventListener('input', aplicarFiltroConDebounce);
+  }
+  if (filtroBuscarDoc) {
+    filtroBuscarDoc.addEventListener('input', aplicarFiltroConDebounce);
+  }
+</script>

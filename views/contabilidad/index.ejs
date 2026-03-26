@@ -1,0 +1,662 @@
+<div class="contabilidad-compact">
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Contabilidad</h1>
+    <p>Registro de ingresos, egresos y balance financiero</p>
+    <p class="text-muted mb-0">Viendo datos de: <strong><%= centroLabel || 'Consolidado General' %></strong></p>
+  </div>
+  <div class="d-flex align-items-center gap-2 no-print">
+    <form action="/contabilidad" method="get" class="d-flex align-items-center gap-2">
+      <label class="form-label mb-0">Centro de costo</label>
+      <select name="centro" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="consolidado" <%= filtros?.centro === 'consolidado' ? 'selected' : '' %>>Consolidado General</option>
+        <option value="admin" <%= filtros?.centro === 'admin' ? 'selected' : '' %>>Oficina Central</option>
+        <% if (typeof proyectos !== 'undefined' && Array.isArray(proyectos)) { %>
+          <% proyectos.forEach((p) => { %>
+            <option value="<%= p.id %>" <%= String(filtros?.centro || '') === String(p.id) ? 'selected' : '' %>><%= p.nombre %></option>
+          <% }) %>
+        <% } %>
+      </select>
+      <input type="hidden" name="periodo" value="<%= filtros?.periodo || 'mes_actual' %>">
+      <input type="hidden" name="desde" value="<%= filtros?.desde || '' %>">
+      <input type="hidden" name="hasta" value="<%= filtros?.hasta || '' %>">
+      <input type="hidden" name="tipo" value="<%= filtros?.tipo || '' %>">
+      <input type="hidden" name="categoria" value="<%= filtros?.categoria || '' %>">
+      <input type="hidden" name="estado_pago" value="<%= filtros?.estado_pago || '' %>">
+    </form>
+    <button type="button" class="btn btn-export-pdf" onclick="exportarModuloPDF()">
+      <i class="bi bi-filetype-pdf"></i> Exportar a PDF
+    </button>
+  </div>
+</div>
+
+<%
+  const fechaReporte = new Date();
+  const totalAsientos = asientos.length;
+  const totalCentros = Array.isArray(proyectosSummary) ? proyectosSummary.length : 0;
+  const totalFilasPDF = isConsolidado ? totalCentros : totalAsientos;
+  const ingresosTotal = Number(resumen.ingresos || 0);
+  const egresosTotal = Number(resumen.egresos || 0);
+  const balanceTotal = Number(resumen.balance || 0);
+  const margenTotal = Number(margen || 0);
+  const planIngreso = (planCuentas && planCuentas.Ingreso) ? planCuentas.Ingreso : [];
+  const planEgreso = (planCuentas && planCuentas.Egreso) ? planCuentas.Egreso : [];
+  const tipoDefault = (filtros && filtros.tipo && ['Ingreso', 'Egreso'].includes(filtros.tipo)) ? filtros.tipo : 'Ingreso';
+  const categoriasDefault = tipoDefault === 'Egreso' ? planEgreso : planIngreso;
+  const fmtFecha = (date) => {
+    if (!date) return '-';
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+  const claseSemaforoMargen = (valor) => {
+    const n = Number(valor || 0);
+    if (n < 0) return 'margen-critico';
+    if (n < 10) return 'margen-alerta';
+    return 'margen-excelente';
+  };
+  const buildCentroHref = (centroId) => {
+    const params = new URLSearchParams();
+    params.set('centro', String(centroId));
+    if (filtros?.periodo) params.set('periodo', filtros.periodo);
+    if (filtros?.desde) params.set('desde', filtros.desde);
+    if (filtros?.hasta) params.set('hasta', filtros.hasta);
+    return `/contabilidad?${params.toString()}`;
+  };
+%>
+
+<section class="module-print-report print-only" aria-hidden="true">
+  <div class="module-print-banner">
+    <div class="module-print-brand">
+      <div class="module-print-logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64" role="img" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="14" fill="#0f172a"></rect>
+          <path d="M18 44V20h8l6 8 6-8h8v24h-8V33l-6 8-6-8v11h-8z" fill="#f8fafc"></path>
+          <rect x="12" y="48" width="40" height="5" rx="2.5" fill="#d4a017"></rect>
+        </svg>
+      </div>
+      <div>
+        <p class="module-print-company">Cismining</p>
+        <p class="module-print-system">ERP Construcción</p>
+      </div>
+    </div>
+    <div class="module-print-docmeta">
+      <span>DOC-CONTABILIDAD</span>
+      <strong>Version 1.0</strong>
+    </div>
+  </div>
+  <div class="module-print-head">
+    <div>
+      <p class="module-print-eyebrow">Documento corporativo</p>
+      <h2>Reporte Oficial de Contabilidad</h2>
+      <p>
+        <%= isConsolidado ? 'Consolidado ejecutivo por centros de costo.' : 'Detalle operativo de asientos contables.' %>
+      </p>
+    </div>
+    <div class="module-print-meta-right">
+      <div><strong>Emitido:</strong> <%= fmtFecha(fechaReporte) %></div>
+      <div><strong>Preparado por:</strong> <%= currentUser?.nombre || 'Sistema' %></div>
+      <div><strong>Vista:</strong> <%= centroLabel || 'Consolidado General' %></div>
+      <div><strong>Registros:</strong> <%= totalFilasPDF %></div>
+      <div><strong>Periodo:</strong> <%= filtros?.desde ? fmtFecha(filtros.desde) : '-' %> a <%= filtros?.hasta ? fmtFecha(filtros.hasta) : '-' %></div>
+    </div>
+  </div>
+
+  <div class="module-print-metrics">
+    <article><span>Ingresos</span><strong>S/ <%= ingresosTotal.toFixed(2) %></strong></article>
+    <article><span>Egresos</span><strong>S/ <%= egresosTotal.toFixed(2) %></strong></article>
+    <article><span>Balance</span><strong>S/ <%= balanceTotal.toFixed(2) %></strong></article>
+    <article><span><%= isConsolidado ? 'Centros' : 'Asientos' %></span><strong><%= totalFilasPDF %></strong></article>
+  </div>
+
+  <% if (isConsolidado) { %>
+  <table class="table table-sm module-print-table">
+    <thead>
+      <tr>
+        <th>Centro de costo</th>
+        <th>Ingresos (S/)</th>
+        <th>Egresos (S/)</th>
+        <th>Balance (S/)</th>
+        <th>Margen</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!Array.isArray(proyectosSummary) || !proyectosSummary.length) { %>
+        <tr><td colspan="5" class="text-center">Sin datos consolidados para el periodo.</td></tr>
+      <% } %>
+      <% (proyectosSummary || []).forEach((p) => { %>
+        <tr>
+          <td><%= p.centro_nombre %></td>
+          <td><strong><%= Number(p.ingresos || 0).toFixed(2) %></strong></td>
+          <td><%= Number(p.egresos || 0).toFixed(2) %></td>
+          <td><%= Number(p.balance || 0).toFixed(2) %></td>
+          <td><%= Number(p.margen || 0).toFixed(2) %>%</td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } else { %>
+  <table class="table table-sm module-print-table">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Tipo</th>
+        <th>Categoria</th>
+        <th>Descripcion</th>
+        <th>Estado</th>
+        <th>Monto (S/)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!asientos.length) { %>
+        <tr><td colspan="6" class="text-center">Sin asientos registrados.</td></tr>
+      <% } %>
+      <% asientos.forEach((a) => { %>
+        <tr>
+          <td><%= fmtFecha(a.fecha) %></td>
+          <td><%= a.tipo %></td>
+          <td><%= a.categoria || '-' %></td>
+          <td><%= a.descripcion || '-' %></td>
+          <td><%= a.estado_pago || 'Pagado' %></td>
+          <td><strong><%= Number(a.monto || 0).toFixed(2) %></strong></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+
+  <% if (mostrarCxPDetalle) { %>
+  <p class="module-print-subtable-title">Cuentas por Pagar - Detalle</p>
+  <table class="table table-sm module-print-table">
+    <thead>
+      <tr>
+        <th>Centro</th>
+        <th>Proveedor / Referencia</th>
+        <th>Categoria</th>
+        <th>Mov.</th>
+        <th>Pendiente (S/)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!Array.isArray(cuentasPorPagar) || !cuentasPorPagar.length) { %>
+        <tr><td colspan="5" class="text-center">No hay cuentas por pagar con estos filtros.</td></tr>
+      <% } %>
+      <% (cuentasPorPagar || []).forEach((item) => { %>
+        <tr>
+          <td><%= item.centro_nombre %></td>
+          <td><%= item.proveedor_referencia %></td>
+          <td><%= item.categoria %></td>
+          <td><%= item.movimientos %></td>
+          <td><strong><%= Number(item.total_pendiente || 0).toFixed(2) %></strong></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+
+  <div class="module-print-footer">
+    <div>
+      <span class="label">Preparado por:</span>
+      <strong><%= currentUser?.nombre || 'Sistema' %></strong>
+    </div>
+    <div>
+      <span class="label">Clasificacion:</span>
+      <strong>Uso Interno - Gestion de Proyecto</strong>
+    </div>
+  </div>
+</section>
+
+<div class="no-print">
+<div class="row g-3 mb-4">
+  <div class="col-md-6 col-xl-3">
+    <div class="kpi-card success">
+      <div class="kpi-icon"><i class="bi bi-arrow-up-circle"></i></div>
+      <span>Ingresos</span>
+      <h2>S/ <%= ingresosTotal.toFixed(2) %></h2>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="kpi-card danger">
+      <div class="kpi-icon"><i class="bi bi-arrow-down-circle"></i></div>
+      <span>Egresos</span>
+      <h2>S/ <%= egresosTotal.toFixed(2) %></h2>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="kpi-card">
+      <div class="kpi-icon"><i class="bi bi-wallet2"></i></div>
+      <span>Balance</span>
+      <h2>S/ <%= balanceTotal.toFixed(2) %></h2>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="kpi-card <%= margenTotal < 5 ? 'danger' : (margenTotal < 12 ? 'warning' : 'success') %>">
+      <div class="kpi-icon"><i class="bi bi-percent"></i></div>
+      <span>Margen de utilidad</span>
+      <h2><%= margenTotal.toFixed(2) %>%</h2>
+    </div>
+  </div>
+</div>
+
+<% if (typeof estadoPagoEnabled !== 'undefined' && estadoPagoEnabled && typeof resumenPorEstado !== 'undefined') { %>
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="panel-card panel-card-accent-success">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-check-circle"></i> Flujo de Caja - Pagado</div>
+      </div>
+      <div class="panel-body">
+        <div class="row g-3 text-center">
+          <div class="col-6">
+            <small class="text-muted">Ingresos</small>
+            <h4 class="text-success">S/ <%= Number(resumenPorEstado.pagado.ingresos).toFixed(2) %></h4>
+          </div>
+          <div class="col-6">
+            <small class="text-muted">Egresos</small>
+            <h4 class="text-danger">S/ <%= Number(resumenPorEstado.pagado.egresos).toFixed(2) %></h4>
+          </div>
+          <div class="col-12">
+            <small class="text-muted">Balance (en caja)</small>
+            <h4 class="fw-bold <%= Number(resumenPorEstado.pagado.balance) >= 0 ? 'text-success' : 'text-danger' %>">S/ <%= Number(resumenPorEstado.pagado.balance).toFixed(2) %></h4>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <a href="<%= ctasPorPagarHref || '/contabilidad?tipo=Egreso&estado_pago=Pendiente#cxp-detalle' %>" class="panel-link-card" title="Ver detalle de Cuentas por Pagar">
+      <div class="panel-card panel-card-accent-warning panel-clickable">
+        <div class="panel-card-header">
+          <div class="panel-title"><i class="bi bi-hourglass-split"></i> Flujo de Caja - Pendiente</div>
+          <small class="text-muted">Ver Cuentas por Pagar <i class="bi bi-arrow-right"></i></small>
+        </div>
+        <div class="panel-body">
+          <div class="row g-3 text-center">
+            <div class="col-6">
+              <small class="text-muted">Ingresos</small>
+              <h4 class="text-success">S/ <%= Number(resumenPorEstado.pendiente.ingresos).toFixed(2) %></h4>
+            </div>
+            <div class="col-6">
+              <small class="text-muted">Egresos</small>
+              <h4 class="text-danger">S/ <%= Number(resumenPorEstado.pendiente.egresos).toFixed(2) %></h4>
+            </div>
+            <div class="col-12">
+              <small class="text-muted">Balance (comprometido)</small>
+              <h4 class="fw-bold <%= Number(resumenPorEstado.pendiente.balance) >= 0 ? 'text-primary' : 'text-danger' %>">S/ <%= Number(resumenPorEstado.pendiente.balance).toFixed(2) %></h4>
+            </div>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+<% } %>
+
+<%
+  let proyectosEnRojo = [];
+  if (typeof proyectosSummary !== 'undefined' && Array.isArray(proyectosSummary)) {
+    proyectosEnRojo = proyectosSummary.filter(p => Number(p.margen || 0) < 0);
+  }
+%>
+
+<% if (proyectosEnRojo.length > 0) { %>
+<div class="alert alert-danger alert-dismissible fade show" role="alert" style="border-left: 5px solid #dc3545; font-weight: 500;">
+  <i class="bi bi-exclamation-triangle"></i> <strong>⚠️ ALERTA CORPORATIVA:</strong> <%= proyectosEnRojo.length %> proyecto(s) con margen negativo.
+  <% proyectosEnRojo.forEach((p, i) => { %>
+    <span class="badge bg-dark ms-2"><%= p.centro_nombre %>: <%= Number(p.margen).toFixed(2) %>%</span>
+  <% }) %>
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+</div>
+<% } %>
+
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="panel-card h-100">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-funnel"></i> Filtros ejecutivos</div>
+      </div>
+      <div class="panel-body">
+        <form action="/contabilidad" method="get" class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">Periodo</label>
+            <select name="periodo" class="form-select">
+              <option value="">Personalizado</option>
+              <option value="mes_actual" <%= filtros?.periodo === 'mes_actual' ? 'selected' : '' %>>Mes actual</option>
+              <option value="trimestre_actual" <%= filtros?.periodo === 'trimestre_actual' ? 'selected' : '' %>>Trimestre actual</option>
+              <option value="anio_actual" <%= filtros?.periodo === 'anio_actual' ? 'selected' : '' %>>Año actual</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Desde</label>
+            <input type="date" name="desde" class="form-control" value="<%= filtros?.desde || '' %>">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Hasta</label>
+            <input type="date" name="hasta" class="form-control" value="<%= filtros?.hasta || '' %>">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Centro de costo</label>
+            <select name="centro" class="form-select">
+              <option value="consolidado" <%= filtros?.centro === 'consolidado' ? 'selected' : '' %>>Consolidado General</option>
+              <option value="admin" <%= filtros?.centro === 'admin' ? 'selected' : '' %>>Oficina Central</option>
+              <% if (typeof proyectos !== 'undefined' && Array.isArray(proyectos)) { %>
+                <% proyectos.forEach((p) => { %>
+                  <option value="<%= p.id %>" <%= String(filtros?.centro || '') === String(p.id) ? 'selected' : '' %>><%= p.nombre %></option>
+                <% }) %>
+              <% } %>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Categoria</label>
+            <select name="categoria" id="categoria-filtro" class="form-select">
+              <option value="">Todas</option>
+              <% planIngreso.forEach((cat) => { %>
+                <option value="<%= cat %>" <%= filtros?.categoria === cat ? 'selected' : '' %>><%= cat %></option>
+              <% }) %>
+              <% planEgreso.forEach((cat) => { %>
+                <option value="<%= cat %>" <%= filtros?.categoria === cat ? 'selected' : '' %>><%= cat %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Tipo</label>
+            <select name="tipo" id="tipo-filtro" class="form-select">
+              <option value="">Todos</option>
+              <option value="Ingreso" <%= filtros?.tipo === 'Ingreso' ? 'selected' : '' %>>Ingreso</option>
+              <option value="Egreso" <%= filtros?.tipo === 'Egreso' ? 'selected' : '' %>>Egreso</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Estado pago</label>
+            <select name="estado_pago" class="form-select" <%= estadoPagoEnabled ? '' : 'disabled' %>>
+              <option value="">Todos</option>
+              <option value="Pagado" <%= filtros?.estado_pago === 'Pagado' ? 'selected' : '' %>>Pagado</option>
+              <option value="Pendiente" <%= filtros?.estado_pago === 'Pendiente' ? 'selected' : '' %>>Pendiente</option>
+            </select>
+          </div>
+          <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Aplicar</button>
+            <a href="/contabilidad" class="btn btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i> Limpiar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (isConsolidado) { %>
+<div class="panel-card mb-4">
+  <div class="panel-card-header">
+    <div class="panel-title"><i class="bi bi-building"></i> Resumen por Centro de Costo</div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead class="table-light">
+        <tr>
+          <th>Centro de Costo</th>
+          <th class="text-end">Ingresos</th>
+          <th class="text-end">Egresos</th>
+          <th class="text-end">Balance</th>
+          <th class="text-end">Margen</th>
+          <th class="text-center">Acción</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (typeof proyectosSummary !== 'undefined' && Array.isArray(proyectosSummary)) { %>
+          <% proyectosSummary.forEach((p) => { %>
+            <tr>
+              <td><strong><%= p.centro_nombre %></strong></td>
+              <td class="text-end text-success"><strong>S/ <%= Number(p.ingresos).toFixed(2) %></strong></td>
+              <td class="text-end text-danger">S/ <%= Number(p.egresos).toFixed(2) %></td>
+              <td class="text-end fw-semibold">S/ <%= Number(p.balance).toFixed(2) %></td>
+              <td class="text-end">
+                <span class="margen-semaforo <%= claseSemaforoMargen(p.margen) %>">
+                  <span class="margen-dot" aria-hidden="true"></span>
+                  <%= Number(p.margen).toFixed(2) %>%
+                </span>
+              </td>
+              <td class="text-center">
+                <a href="<%= buildCentroHref(p.centro_id) %>" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-arrow-right"></i> Ver
+                </a>
+              </td>
+            </tr>
+          <% }) %>
+        <% } else { %>
+          <tr><td colspan="6" class="text-center text-muted py-4">Sin datos registrados.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>
+
+<% if (mostrarCxPDetalle) { %>
+<div id="cxp-detalle" class="panel-card mb-4">
+  <div class="panel-card-header">
+    <div class="panel-title"><i class="bi bi-receipt-cutoff"></i> Cuentas por Pagar - Detalle</div>
+    <small class="text-muted">Total pendiente: S/ <%= Number(resumenPorEstado?.pendiente?.egresos || 0).toFixed(2) %></small>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Centro de costo</th>
+          <th>Proveedor / Referencia</th>
+          <th>Categoria</th>
+          <th class="text-end">Mov.</th>
+          <th class="text-end">Ultimo registro</th>
+          <th class="text-end">Pendiente (S/)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (Array.isArray(cuentasPorPagar) && cuentasPorPagar.length) { %>
+          <% cuentasPorPagar.forEach((item) => { %>
+            <tr>
+              <td><strong><%= item.centro_nombre %></strong></td>
+              <td><%= item.proveedor_referencia %></td>
+              <td class="text-muted"><%= item.categoria %></td>
+              <td class="text-end"><%= item.movimientos %></td>
+              <td class="text-end"><%= fmtFecha(item.ultima_fecha) %></td>
+              <td class="text-end fw-semibold text-danger">S/ <%= Number(item.total_pendiente || 0).toFixed(2) %></td>
+            </tr>
+          <% }) %>
+        <% } else { %>
+          <tr><td colspan="6" class="text-center text-muted py-4">No hay cuentas por pagar con los filtros actuales.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>
+
+<% if (!isConsolidado) { %>
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="form-section">
+      <div class="form-section-title"><i class="bi bi-journal-plus"></i> Registrar asiento contable</div>
+      <div class="form-section-body">
+        <form action="/contabilidad/asientos" method="post" class="row g-3">
+          <input type="hidden" name="next_centro" value="<%= filtros?.centro || 'consolidado' %>">
+          <div class="col-md-6">
+            <label class="form-label">Fecha</label>
+            <input type="date" name="fecha" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Tipo</label>
+            <select name="tipo" id="tipo-asiento" class="form-select" required>
+              <option value="Ingreso">Ingreso</option>
+              <option value="Egreso">Egreso</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Categoría</label>
+            <select name="categoria" id="categoria-asiento" class="form-select" required>
+              <% categoriasDefault.forEach((cat) => { %>
+                <option value="<%= cat %>"><%= cat %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Centro de costo</label>
+            <select name="proyecto_id" class="form-select" required>
+              <option value="admin">Gastos Administrativos / Oficina Central</option>
+              <% if (typeof proyectos !== 'undefined' && Array.isArray(proyectos)) { %>
+                <% proyectos.forEach(p => { %>
+                  <option value="<%= p.id %>"><%= p.nombre %></option>
+                <% }) %>
+              <% } %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Estado de pago</label>
+            <select name="estado_pago" class="form-select" <%= estadoPagoEnabled ? '' : 'disabled' %>>
+              <option value="Pagado">Pagado</option>
+              <option value="Pendiente">Pendiente</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Descripción</label>
+            <input name="descripcion" class="form-control" placeholder="Descripción del movimiento" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Monto (S/)</label>
+            <input type="number" step="0.01" min="0.01" name="monto" class="form-control" placeholder="0.00" required>
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary">
+              <i class="bi bi-check-lg"></i> Guardar asiento
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-journal-text"></i> Últimos asientos</div>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle table-hover">
+          <thead>
+            <tr><th>Fecha</th><th>Tipo</th><th>Categoria</th><th>Centro de costo</th><th>Descripcion</th><th>Estado</th><th>Usuario</th><th>Monto</th></tr>
+          </thead>
+          <tbody>
+            <% asientos.forEach(a => { %>
+            <tr>
+              <td><%= fmtFecha(a.fecha) %></td>
+              <td>
+                <span class="rounded-badge <%= a.tipo === 'Ingreso' ? 'estado-completado' : 'estado-cancelado' %>">
+                  <%= a.tipo %>
+                </span>
+              </td>
+              <td class="text-muted"><%= a.categoria %></td>
+              <td><%= a.proyecto_nombre || 'Oficina Central' %></td>
+              <td><%= a.descripcion %></td>
+              <td>
+                <span class="rounded-badge <%= (a.estado_pago || 'Pagado') === 'Pagado' ? 'estado-completado' : 'estado-pendiente' %>">
+                  <%= a.estado_pago || 'Pagado' %>
+                </span>
+              </td>
+              <td class="text-muted"><%= a.registrado_por || 'SISTEMA' %></td>
+              <td class="fw-semibold">S/ <%= Number(a.monto).toFixed(2) %></td>
+            </tr>
+            <% }) %>
+            <% if (!asientos.length) { %>
+              <tr><td colspan="8"><div class="empty-state"><i class="bi bi-journal"></i><p>Sin asientos registrados</p></div></td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>
+
+</div>
+
+<script id="plan-ingreso-json" type="application/json"><%- JSON.stringify(planIngreso) %></script>
+<script id="plan-egreso-json" type="application/json"><%- JSON.stringify(planEgreso) %></script>
+
+<script>
+  (function () {
+    const planIngresoNode = document.getElementById('plan-ingreso-json');
+    const planEgresoNode = document.getElementById('plan-egreso-json');
+    const planCuentas = {
+      Ingreso: JSON.parse(planIngresoNode ? planIngresoNode.textContent : '[]'),
+      Egreso: JSON.parse(planEgresoNode ? planEgresoNode.textContent : '[]')
+    };
+
+    // Dinámico para Registrar asiento
+    const tipoInput = document.getElementById('tipo-asiento');
+    const categoriaInput = document.getElementById('categoria-asiento');
+
+    function cargarCategorias(tipo, targetSelect) {
+      const categorias = planCuentas[tipo] || [];
+      targetSelect.innerHTML = '';
+
+      categorias.forEach((categoria) => {
+        const option = document.createElement('option');
+        option.value = categoria;
+        option.textContent = categoria;
+        targetSelect.appendChild(option);
+      });
+    }
+
+    if (tipoInput && categoriaInput) {
+      tipoInput.addEventListener('change', function () {
+        cargarCategorias(this.value, categoriaInput);
+      });
+      cargarCategorias(tipoInput.value, categoriaInput);
+    }
+
+    // Dinámico para Filtros ejecutivos
+    const tipoFiltro = document.getElementById('tipo-filtro');
+    const categoriaFiltro = document.getElementById('categoria-filtro');
+
+    if (tipoFiltro && categoriaFiltro) {
+      tipoFiltro.addEventListener('change', function () {
+        const selectedCategoriaValue = categoriaFiltro.value;
+        const tipo = this.value;
+        
+        // Limpia las opciones
+        categoriaFiltro.innerHTML = '<option value="">Todas</option>';
+
+        // Si hay tipo seleccionado, muestra solo esas categorías
+        if (tipo) {
+          const categorias = planCuentas[tipo] || [];
+          categorias.forEach((categoria) => {
+            const option = document.createElement('option');
+            option.value = categoria;
+            option.textContent = categoria;
+            if (categoria === selectedCategoriaValue) {
+              option.selected = true;
+            }
+            categoriaFiltro.appendChild(option);
+          });
+        } else {
+          // Si no hay tipo, muestra todas las categorías
+          Object.values(planCuentas).flat().forEach((categoria) => {
+            const option = document.createElement('option');
+            option.value = categoria;
+            option.textContent = categoria;
+            if (categoria === selectedCategoriaValue) {
+              option.selected = true;
+            }
+            if (!Array.from(categoriaFiltro.options).some(o => o.value === categoria)) {
+              categoriaFiltro.appendChild(option);
+            }
+          });
+        }
+      });
+    }
+
+  })();
+
+  function exportarModuloPDF() {
+    window.print();
+  }
+</script>
+
+</div>

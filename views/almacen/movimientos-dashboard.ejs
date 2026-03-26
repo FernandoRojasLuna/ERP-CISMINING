@@ -1,0 +1,396 @@
+<%
+  const currentUser = typeof locals.currentUser === 'object' ? locals.currentUser : {};
+  const movimientosProyectos = Array.isArray(locals.movimientosProyectos) ? locals.movimientosProyectos : [];
+  
+  const fmtFecha = (date) => {
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+  
+  const up = (value, fallback = '-') => {
+    const cleaned = String(value || '').trim();
+    return cleaned ? cleaned.toUpperCase() : fallback;
+  };
+%>
+
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Almacén</h1>
+    <p>Gestión multi-proyecto de base de materiales, asignaciones por obra y movimientos</p>
+  </div>
+</div>
+
+<div class="submodule-shell">
+  <nav class="submodule-tabs" aria-label="Submódulos de almacén">
+    <a href="/almacen?mod=base-materiales" class="submodule-tab">
+      <i class="bi bi-database"></i>
+      <span>Base de Datos Materiales</span>
+    </a>
+    <a href="/almacen?mod=almacen" class="submodule-tab">
+      <i class="bi bi-boxes"></i>
+      <span>Almacén por Proyecto</span>
+    </a>
+    <a href="/almacen/movimientos" class="submodule-tab active">
+      <i class="bi bi-arrow-left-right"></i>
+      <span>Movimientos</span>
+    </a>
+  </nav>
+
+<div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="info-banner info-banner-primary">
+        <i class="bi bi-info-circle"></i>
+        <div>
+          <h5>Dos flujos de movimiento</h5>
+          <p><strong>Notas de Entrada:</strong> Registra ingresos de materiales (guías de remisión, facturas de compra).</p>
+          <p><strong>Notas de Salida:</strong> Registra consumo de obra y retiro de materiales a frentes de trabajo.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <% if (movimientosProyectos.length > 0) { %>
+      <% movimientosProyectos.forEach((proyecto) => { %>
+        <div class="col-lg-6 col-xl-4">
+          <div class="movimento-card">
+            <div class="movimento-card-header">
+              <div class="movimento-card-title">
+                <h4><%= up(proyecto.nombre) %></h4>
+                <p class="movimento-card-sublabel"><i class="bi bi-geo-alt"></i> <%= up(proyecto.ubicacion || 'Sin ubicación') %></p>
+              </div>
+              <span class="badge badge-project <%= 'badge-status-' + (proyecto.estado || 'general').replace(/\s+/g, '-').toLowerCase() %>">
+                <%= up(proyecto.estado || '-') %>
+              </span>
+            </div>
+
+            <div class="movimento-card-body">
+              <div class="movimento-stats">
+                <div class="movimento-stat">
+                  <span class="movimento-stat-label">Materiales asignados</span>
+                  <span class="movimento-stat-value"><%= proyecto.materialCount || 0 %></span>
+                </div>
+                <div class="movimento-stat">
+                  <span class="movimento-stat-label">Stock disponible</span>
+                  <span class="movimento-stat-value"><%= Number(proyecto.totalStockDisponible || 0).toFixed(0) %></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="movimento-card-actions">
+              <a href="/almacen/movimientos/<%= proyecto.id %>/entradas" class="btn btn-ingreso btn-lg">
+                <i class="bi bi-arrow-down-circle"></i>
+                <span>Notas de Entrada</span>
+                <small>Compras / Guías</small>
+              </a>
+              <a href="/almacen/movimientos/<%= proyecto.id %>/salidas" class="btn btn-salida btn-lg">
+                <i class="bi bi-arrow-up-circle"></i>
+                <span>Notas de Salida</span>
+                <small>Consumo / Despacho</small>
+              </a>
+            </div>
+
+            <div class="movimento-card-footer">
+              <small class="text-muted">
+                Última actividad: <%= fmtFecha(proyecto.ultimaActividad || new Date()) %>
+              </small>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    <% } else { %>
+      <div class="col-12">
+        <div class="panel-card">
+          <div class="panel-body">
+            <div class="empty-state">
+              <i class="bi bi-inbox"></i>
+              <p>No hay proyectos activos disponibles.</p>
+              <small class="text-muted">Primero debe crear un proyecto y asignarle materiales.</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<style>
+  .movimento-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+
+  .movimento-card:hover {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    border-color: #d1d5db;
+    transform: translateY(-4px);
+  }
+
+  .movimento-card-header {
+    padding: 20px;
+    border-bottom: 1px solid #f3f4f6;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .movimento-card-title {
+    flex: 1;
+  }
+
+  .movimento-card-title h4 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 6px 0;
+    color: #111827;
+    letter-spacing: -0.3px;
+  }
+
+  .movimento-card-sublabel {
+    font-size: 13px;
+    color: #6b7280;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .movimento-card-sublabel i {
+    font-size: 12px;
+  }
+
+  .badge-project {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .badge-status-en-ejecucion {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #a7f3d0;
+  }
+
+  .badge-status-planificado {
+    background: #dbeafe;
+    color: #0c4a6e;
+    border: 1px solid #bae6fd;
+  }
+
+  .badge-status-completado {
+    background: #f3e8ff;
+    color: #5b21b6;
+    border: 1px solid #e9d5ff;
+  }
+
+  .badge-status-general {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #e5e7eb;
+  }
+
+  .movimento-card-body {
+    padding: 16px 20px;
+    flex: 1;
+  }
+
+  .movimento-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .movimento-stat {
+    background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    text-align: center;
+  }
+
+  .movimento-stat-label {
+    display: block;
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+
+  .movimento-stat-value {
+    display: block;
+    font-size: 24px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .movimento-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  .btn-ingreso {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border: 1px solid #047857;
+    color: white;
+    padding: 14px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+
+  .btn-ingreso:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
+  }
+
+  .btn-ingreso i {
+    font-size: 18px;
+  }
+
+  .btn-ingreso span {
+    display: block;
+    font-weight: 600;
+  }
+
+  .btn-ingreso small {
+    display: block;
+    font-size: 11px;
+    opacity: 0.9;
+    font-weight: 400;
+  }
+
+  .btn-salida {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border: 1px solid #b91c1c;
+    color: white;
+    padding: 14px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+
+  .btn-salida:hover {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
+  }
+
+  .btn-salida i {
+    font-size: 18px;
+  }
+
+  .btn-salida span {
+    display: block;
+    font-weight: 600;
+  }
+
+  .btn-salida small {
+    display: block;
+    font-size: 11px;
+    opacity: 0.9;
+    font-weight: 400;
+  }
+
+  .movimento-card-footer {
+    padding: 12px 20px;
+    background: #fafafa;
+    border-top: 1px solid #f3f4f6;
+    text-align: center;
+  }
+
+  .info-banner {
+    padding: 16px 20px;
+    border-radius: 10px;
+    border: 1px solid currentColor;
+    display: flex;
+    gap: 16px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .info-banner i {
+    font-size: 20px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .info-banner h5 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+  }
+
+  .info-banner p {
+    margin: 6px 0;
+  }
+
+  .info-banner p:last-child {
+    margin-bottom: 0;
+  }
+
+  .info-banner-primary {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #07407b;
+  }
+
+  .info-banner-primary i,
+  .info-banner-primary h5 {
+    color: #0c4a6e;
+  }
+
+  @media (max-width: 768px) {
+    .movimento-card-actions {
+      grid-template-columns: 1fr;
+    }
+
+    .movimento-card-title h4 {
+      font-size: 16px;
+    }
+
+    .movimento-stats {
+      grid-template-columns: 1fr;
+    }
+
+    .btn-ingreso,
+    .btn-salida {
+      padding: 12px 16px;
+      font-size: 12px;
+    }
+  }
+</style>
+</div>

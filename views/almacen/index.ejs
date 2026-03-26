@@ -1,0 +1,1590 @@
+<%
+  const currentSubmodule = typeof locals.activeSubmodule === 'string' ? locals.activeSubmodule : 'base-materiales';
+  const currentMateriales = Array.isArray(locals.materiales) ? locals.materiales : [];
+  const currentProyectos = Array.isArray(locals.proyectos) ? locals.proyectos : [];
+  const currentAsignaciones = Array.isArray(locals.asignaciones) ? locals.asignaciones : [];
+  const currentTarjetasProyecto = Array.isArray(locals.tarjetasProyecto) ? locals.tarjetasProyecto : [];
+  const currentMovimientos = Array.isArray(locals.movimientos) ? locals.movimientos : [];
+  const currentMetricas = (typeof locals.metricas === 'object' && locals.metricas) ? locals.metricas : {
+    totalMateriales: currentMateriales.length,
+    totalProyectos: currentProyectos.length,
+    totalAsignaciones: currentAsignaciones.length,
+    valorAlmacen: 0,
+    totalMovimientos: currentMovimientos.length
+  };
+  const currentMaterialEdit = typeof locals.materialEdit !== 'undefined' ? locals.materialEdit : null;
+  const currentNextCodigo = typeof locals.nextCodigo !== 'undefined' ? locals.nextCodigo : 'MAT-00000001';
+  const currentCatalogos = (typeof locals.catalogos === 'object' && locals.catalogos)
+    ? locals.catalogos
+    : { familias: [], grupos: [], subgrupos: [], unidades: [] };
+  const currentSelectedProyecto = (typeof locals.selectedProyecto === 'object' && locals.selectedProyecto)
+    ? locals.selectedProyecto
+    : null;
+  const currentSelectedProyectoItems = Array.isArray(locals.selectedProyectoItems) ? locals.selectedProyectoItems : [];
+  const currentAsignacionEdit = (typeof locals.asignacionEdit === 'object' && locals.asignacionEdit)
+    ? locals.asignacionEdit
+    : null;
+
+  const materiales = currentMateriales;
+  const proyectos = currentProyectos;
+  const asignaciones = currentAsignaciones;
+  const tarjetasProyecto = currentTarjetasProyecto;
+  const movimientos = currentMovimientos;
+  const metricas = currentMetricas;
+  const materialEdit = currentMaterialEdit;
+  const nextCodigo = currentNextCodigo;
+  const catalogos = currentCatalogos;
+  const selectedProyecto = currentSelectedProyecto;
+  const selectedProyectoItems = currentSelectedProyectoItems;
+  const asignacionEdit = currentAsignacionEdit;
+
+  const fechaReporte = new Date();
+  const fmtFecha = (date) => {
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+  const fmtMonto = (num) => `S/ ${Number(num || 0).toFixed(2)}`;
+  const up = (value, fallback = '-') => {
+    const cleaned = String(value || '').trim();
+    return cleaned ? cleaned.toUpperCase() : fallback;
+  };
+  const isBase = currentSubmodule === 'base-materiales';
+  const isAlmacen = currentSubmodule === 'almacen';
+  const isMovimientos = currentSubmodule === 'movimientos';
+%>
+
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Almacén</h1>
+    <p>Gestión multi-proyecto de base de materiales, asignaciones por obra y movimientos</p>
+  </div>
+  <div class="d-flex align-items-center gap-2 no-print">
+    <% if (isBase) { %>
+      <button type="button" class="btn btn-export-pdf" onclick="exportarModuloPDF()">
+        <i class="bi bi-filetype-pdf"></i> Exportar a PDF
+      </button>
+    <% } %>
+  </div>
+</div>
+
+<section class="module-print-report print-only" aria-hidden="true">
+  <div class="module-print-banner">
+    <div class="module-print-brand">
+      <div class="module-print-logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64" role="img" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="14" fill="#0f172a"></rect>
+          <path d="M18 44V20h8l6 8 6-8h8v24h-8V33l-6 8-6-8v11h-8z" fill="#f8fafc"></path>
+          <rect x="12" y="48" width="40" height="5" rx="2.5" fill="#d4a017"></rect>
+        </svg>
+      </div>
+      <div>
+        <p class="module-print-company">Cismining</p>
+        <p class="module-print-system">ERP Construcción</p>
+      </div>
+    </div>
+    <div class="module-print-docmeta">
+      <span>DOC-ALMACEN</span>
+      <strong>Version 2.0</strong>
+    </div>
+  </div>
+
+  <% if (isBase) { %>
+    <div class="module-print-head">
+      <div>
+        <p class="module-print-eyebrow">Documento corporativo</p>
+        <h2>Catálogo General de Materiales</h2>
+        <p>Base maestra de materiales para compras, almacén y control de obra.</p>
+      </div>
+      <div class="module-print-meta-right">
+        <div><strong>Emitido:</strong> <%= fmtFecha(fechaReporte) %></div>
+        <div><strong>Preparado por:</strong> <%= currentUser?.nombre || 'Sistema' %></div>
+        <div><strong>Registros:</strong> <%= materiales.length %></div>
+      </div>
+    </div>
+
+    <div class="module-print-metrics">
+      <article><span>Materiales base</span><strong><%= metricas.totalMateriales %></strong></article>
+      <article><span>Familias</span><strong><%= catalogos.familias.length %></strong></article>
+      <article><span>Grupos</span><strong><%= catalogos.grupos.length %></strong></article>
+      <article><span>Subgrupos</span><strong><%= catalogos.subgrupos.length %></strong></article>
+    </div>
+
+    <table class="table table-sm module-print-table">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Material</th>
+          <th>Familia</th>
+          <th>Grupo</th>
+          <th>Subgrupo</th>
+          <th>Unidad</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% materiales.forEach((m) => { %>
+          <tr>
+            <td><%= up(m.codigo) %></td>
+            <td><%= up(m.nombre) %></td>
+            <td><%= up(m.familia || m.categoria || '-') %></td>
+            <td><%= up(m.grupo_material || '-') %></td>
+            <td><%= up(m.subgrupo || '-') %></td>
+            <td><%= up(m.unidad || '-') %></td>
+          </tr>
+        <% }) %>
+        <% if (!materiales.length) { %>
+          <tr><td colspan="6" class="text-center">No hay materiales en la base general.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  <% } %>
+</section>
+
+<div class="submodule-shell no-print">
+  <nav class="submodule-tabs" aria-label="Submódulos de almacén">
+    <a href="/almacen?mod=base-materiales" class="submodule-tab <%= isBase ? 'active' : '' %>">
+      <i class="bi bi-database"></i>
+      <span>Base de Datos Materiales</span>
+    </a>
+    <a href="/almacen?mod=almacen" class="submodule-tab <%= isAlmacen ? 'active' : '' %>">
+      <i class="bi bi-boxes"></i>
+      <span>Almacén por Proyecto</span>
+    </a>
+    <a href="/almacen/movimientos" class="submodule-tab <%= isMovimientos ? 'active' : '' %>">
+      <i class="bi bi-arrow-left-right"></i>
+      <span>Movimientos</span>
+    </a>
+  </nav>
+
+  <div class="row g-3 submodule-kpis">
+    <div class="col-md-3 col-sm-6">
+      <div class="kpi-mini">
+        <div class="kpi-mini-left"><i class="bi bi-database"></i><span class="kpi-mini-label">Materiales base</span></div>
+        <span class="kpi-mini-value"><%= metricas.totalMateriales %></span>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="kpi-mini">
+        <div class="kpi-mini-left"><i class="bi bi-building"></i><span class="kpi-mini-label">Proyectos</span></div>
+        <span class="kpi-mini-value"><%= metricas.totalProyectos %></span>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="kpi-mini">
+        <div class="kpi-mini-left"><i class="bi bi-box2"></i><span class="kpi-mini-label">Asignaciones</span></div>
+        <span class="kpi-mini-value"><%= metricas.totalAsignaciones %></span>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="kpi-mini">
+        <div class="kpi-mini-left"><i class="bi bi-cash-stack"></i><span class="kpi-mini-label">Valor total</span></div>
+        <span class="kpi-mini-value"><%= fmtMonto(metricas.valorAlmacen) %></span>
+      </div>
+    </div>
+  </div>
+
+  <% if (isBase) { %>
+    <div class="row g-3">
+      <div class="col-lg-5">
+        <div class="form-section">
+          <div class="form-section-title">
+            <i class="bi bi-<%= materialEdit ? 'pencil' : 'plus-circle' %>"></i>
+            <%= materialEdit ? 'Editar material base' : 'Nuevo material base' %>
+          </div>
+          <div class="form-section-body">
+            <form action="<%= materialEdit ? '/almacen/materiales/' + materialEdit.id + '?_method=PUT' : '/almacen/materiales' %>" method="post" class="row g-3">
+              <div class="col-md-5">
+                <label class="form-label">Código</label>
+                <input name="codigo" class="form-control"
+                       value="<%= up(materialEdit?.codigo || nextCodigo || 'MAT-00000001') %>"
+                       readonly>
+              </div>
+              <div class="col-md-7">
+                <label class="form-label">Nombre del Material</label>
+                <input name="nombre" class="form-control" placeholder="Nombre descriptivo" value="<%= up(materialEdit?.nombre || '', '') %>" required>
+              </div>
+              <div class="col-md-4">
+                <div class="catalog-label-row">
+                  <label class="form-label">Familia</label>
+                  <button type="button" class="catalog-add-btn" data-catalog-type="familia" title="Agregar familia">
+                    <i class="bi bi-pencil-square"></i>
+                  </button>
+                </div>
+                <select name="familia" id="catalogFamiliaSelect" class="form-select" required>
+                  <option value="">Selecciona familia</option>
+                  <% catalogos.familias.forEach((item) => { %>
+                    <option value="<%= up(item) %>" <%= up(item) === up(materialEdit?.familia || materialEdit?.categoria || '') ? 'selected' : '' %>><%= up(item) %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <div class="catalog-label-row">
+                  <label class="form-label">Grupo</label>
+                  <button type="button" class="catalog-add-btn" data-catalog-type="grupo" title="Agregar grupo">
+                    <i class="bi bi-pencil-square"></i>
+                  </button>
+                </div>
+                <select name="grupo_material" id="catalogGrupoSelect" class="form-select" required>
+                  <option value="">Selecciona grupo</option>
+                  <% (catalogos.gruposDet || []).forEach((item) => { %>
+                    <option value="<%= up(item.valor) %>" data-parent-familia="<%= up(item.parentValor || '', '') %>" <%= up(item.valor) === up(materialEdit?.grupo_material || '') ? 'selected' : '' %>><%= up(item.valor) %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <div class="catalog-label-row">
+                  <label class="form-label">Subgrupo</label>
+                  <button type="button" class="catalog-add-btn" data-catalog-type="subgrupo" title="Agregar subgrupo">
+                    <i class="bi bi-pencil-square"></i>
+                  </button>
+                </div>
+                <select name="subgrupo" id="catalogSubgrupoSelect" class="form-select" required>
+                  <option value="">Selecciona subgrupo</option>
+                  <% (catalogos.subgruposDet || []).forEach((item) => { %>
+                    <option value="<%= up(item.valor) %>" data-parent-grupo="<%= up(item.parentValor || '', '') %>" <%= up(item.valor) === up(materialEdit?.subgrupo || '') ? 'selected' : '' %>><%= up(item.valor) %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <div class="catalog-label-row">
+                  <label class="form-label">Unidad</label>
+                  <button type="button" class="catalog-add-btn" data-catalog-type="unidad" title="Agregar unidad">
+                    <i class="bi bi-pencil-square"></i>
+                  </button>
+                </div>
+                <select name="unidad" id="catalogUnidadSelect" class="form-select" required>
+                  <option value="">Selecciona unidad</option>
+                  <% catalogos.unidades.forEach((item) => { %>
+                    <option value="<%= up(item) %>" <%= up(item) === up(materialEdit?.unidad || '') ? 'selected' : '' %>><%= up(item) %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-12 d-flex gap-2 pt-1">
+                <button class="btn btn-primary">
+                  <i class="bi bi-check-lg"></i> <%= materialEdit ? 'Actualizar material' : 'Guardar material' %>
+                </button>
+                <% if (materialEdit) { %>
+                  <a href="/almacen?mod=base-materiales" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i> Cancelar
+                  </a>
+                <% } %>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <i class="bi bi-truck"></i>
+              <span>Nuevo Proveedor</span>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="abrirListaProveedores()" title="Ver lista de proveedores" style="padding: 4px 12px; height: auto; white-space: nowrap;">
+              <i class="bi bi-list-check"></i> LISTA PROVEEDOR
+            </button>
+          </div>
+          <div class="form-section-body">
+            <form action="/almacen/proveedores" method="post" class="row g-3">
+              <div class="col-12">
+                <label class="form-label">Nombre del Proveedor <span class="badge badge-required">Obligatorio</span></label>
+                <input name="nombre" class="form-control" placeholder="Nombre empresa" required maxlength="150">
+              </div>
+              
+              <div class="col-md-6">
+                <label class="form-label">RUC <span class="badge badge-required">Obligatorio</span></label>
+                <input name="ruc" class="form-control" placeholder="RUC o documento" required maxlength="15">
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">Contacto</label>
+                <input name="contacto" class="form-control" placeholder="Nombre contacto" maxlength="150">
+              </div>
+
+              <div class="col-12">
+                <label class="form-label">Dirección</label>
+                <input name="direccion" class="form-control" placeholder="Dirección de oficina/almacén" maxlength="255">
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">Teléfono</label>
+                <input name="telefono" class="form-control" placeholder="+51 999 999 999" maxlength="20">
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">Email</label>
+                <input name="email" class="form-control" type="email" placeholder="correo@proveedor.com" maxlength="100">
+              </div>
+
+              <div class="col-12 pt-1">
+                <button class="btn btn-primary" style="width: 100%;">
+                  <i class="bi bi-check-lg"></i> Guardar Proveedor
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-7">
+        <div class="panel-card mb-3">
+          <div class="panel-card-header">
+            <div class="panel-title"><i class="bi bi-funnel"></i> Filtros del catálogo</div>
+          </div>
+          <div class="panel-body">
+            <div class="row g-2">
+              <div class="col-md-4">
+                <label class="form-label">Código</label>
+                <input type="text" id="filtroCatalogoCodigo" class="form-control" placeholder="Filtrar por código">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Material</label>
+                <input type="text" id="filtroCatalogoMaterial" class="form-control" placeholder="Filtrar por material">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Familia / Grupo / Subgrupo</label>
+                <input type="text" id="filtroCatalogoClasificacion" class="form-control" placeholder="Filtrar por clasificación">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-card-header">
+            <div class="panel-title"><i class="bi bi-database"></i> Catálogo general de materiales</div>
+            <span class="badge badge-secondary"><%= materiales.length %> registros</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table align-middle table-hover" id="tablaCatalogoMateriales">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Material</th>
+                  <th>Familia</th>
+                  <th>Grupo</th>
+                  <th>Subgrupo</th>
+                  <th>Unidad</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% materiales.forEach((m) => { %>
+                  <tr
+                    data-codigo="<%= up(m.codigo) %>"
+                    data-material="<%= up(m.nombre) %>"
+                    data-familia="<%= up(m.familia || m.categoria || '') %>"
+                    data-grupo="<%= up(m.grupo_material || '') %>"
+                    data-subgrupo="<%= up(m.subgrupo || '') %>">
+                    <td><span class="badge badge-secondary material-code-badge"><%= up(m.codigo) %></span></td>
+                    <td class="fw-semibold"><%= up(m.nombre) %></td>
+                    <td><%= up(m.familia || m.categoria || '-') %></td>
+                    <td><%= up(m.grupo_material || '-') %></td>
+                    <td><%= up(m.subgrupo || '-') %></td>
+                    <td><%= up(m.unidad || '-') %></td>
+                    <td>
+                      <div class="d-flex gap-1">
+                        <a href="/almacen/materiales/<%= m.id %>/editar" class="btn btn-xs btn-primary" title="Editar">
+                          <i class="bi bi-pencil"></i>
+                        </a>
+                        <form action="/almacen/materiales/<%= m.id %>?_method=DELETE" method="post"
+                              onsubmit="return confirm('¿Eliminar material? Se eliminarán también sus asignaciones y movimientos relacionados.')">
+                          <button class="btn btn-xs btn-outline-danger" type="submit" title="Eliminar">
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+                <% if (!materiales.length) { %>
+                  <tr><td colspan="7"><div class="empty-state"><i class="bi bi-database"></i><p>No hay materiales en la base general</p></div></td></tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (isAlmacen) { %>
+    <div class="project-bullets-grid mb-3">
+      <% tarjetasProyecto.forEach((proyecto) => { %>
+        <a
+          href="/almacen/proyectos/<%= proyecto.id %>"
+          onclick="window.location.href=this.href"
+          class="project-bullet-card">
+          <div class="project-bullet-dot"></div>
+          <div class="project-bullet-body">
+            <h4><%= up(proyecto.nombre) %></h4>
+            <p><%= proyecto.items.length %> materiales asignados</p>
+          </div>
+          <span class="badge badge-primary"><%= fmtMonto(proyecto.totalImporte) %></span>
+        </a>
+      <% }) %>
+      <% if (!tarjetasProyecto.length) { %>
+        <div class="panel-card">
+          <div class="panel-body">
+            <div class="empty-state"><i class="bi bi-building"></i><p>No hay proyectos disponibles para asignación</p></div>
+          </div>
+        </div>
+      <% } %>
+    </div>
+    <div class="panel-card">
+      <div class="panel-body">
+        <div class="empty-state">
+          <i class="bi bi-hand-index-thumb"></i>
+          <p>Selecciona una tarjeta para abrir la vista detallada del proyecto.</p>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- Movimientos: Los usuarios son redirigidos a /almacen/movimientos para la nueva interfaz de 3 fases -->
+</div>
+
+<% if (isAlmacen && selectedProyecto) { %>
+  <section class="module-print-report print-only project-print-report" aria-hidden="true">
+    <div class="module-print-banner">
+      <div class="module-print-brand">
+        <div class="module-print-logo" aria-hidden="true">
+          <svg viewBox="0 0 64 64" role="img" focusable="false">
+            <rect x="2" y="2" width="60" height="60" rx="14" fill="#0f172a"></rect>
+            <path d="M18 44V20h8l6 8 6-8h8v24h-8V33l-6 8-6-8v11h-8z" fill="#f8fafc"></path>
+            <rect x="12" y="48" width="40" height="5" rx="2.5" fill="#d4a017"></rect>
+          </svg>
+        </div>
+        <div>
+          <p class="module-print-company">Cismining</p>
+          <p class="module-print-system">ERP Construcción</p>
+        </div>
+      </div>
+      <div class="module-print-docmeta">
+        <span>DOC-ALM-PROY</span>
+        <strong>Versión 1.0</strong>
+      </div>
+    </div>
+    <div class="module-print-head">
+      <div>
+        <p class="module-print-eyebrow">Documento corporativo</p>
+        <h2>Reporte de Almacén por Proyecto</h2>
+        <p>Control de materiales asignados para la obra seleccionada.</p>
+      </div>
+      <div class="module-print-meta-right">
+        <div><strong>Proyecto:</strong> <%= up(selectedProyecto.nombre) %></div>
+        <div><strong>Emitido:</strong> <%= fmtFecha(fechaReporte) %></div>
+        <div><strong>Preparado por:</strong> <%= up(currentUser?.nombre || 'SISTEMA') %></div>
+      </div>
+    </div>
+    <div class="module-print-metrics">
+      <article><span>Materiales</span><strong><%= selectedProyectoItems.length %></strong></article>
+      <article><span>Valor total</span><strong><%= fmtMonto(selectedProyectoItems.reduce((acc, item) => acc + Number(item.importe || 0), 0)) %></strong></article>
+      <article><span>Estado obra</span><strong><%= up(selectedProyecto.estado || '-') %></strong></article>
+      <article><span>Clasificación</span><strong>USO INTERNO</strong></article>
+    </div>
+    <table class="table table-sm module-print-table">
+      <thead>
+        <tr>
+          <th>Material</th>
+          <th>Unidad</th>
+          <th>Cantidad</th>
+          <th>Precio</th>
+          <th>Importe</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% selectedProyectoItems.forEach((item) => { %>
+          <tr>
+            <td><%= up(item.material_nombre) %></td>
+            <td><%= up(item.unidad) %></td>
+            <td><strong><%= Number(item.cantidad_disponible || 0).toFixed(2) %></strong></td>
+            <td><%= fmtMonto(item.precio_unitario) %></td>
+            <td><strong><%= fmtMonto(item.importe) %></strong></td>
+          </tr>
+        <% }) %>
+        <% if (!selectedProyectoItems.length) { %>
+          <tr><td colspan="5" class="text-center">Sin materiales asignados para esta obra.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </section>
+<% } %>
+
+<div class="modal fade" id="catalogoModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content catalog-modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="catalogoModalTitle">Nuevo catálogo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <form id="catalogoModalForm" method="post" action="/almacen/catalogos">
+        <div class="modal-body">
+          <input type="hidden" name="tipo" id="catalogoModalTipo">
+          <input type="hidden" name="parent_tipo" id="catalogoModalParentTipo">
+          <input type="hidden" name="parent_valor" id="catalogoModalParentValor">
+          <div class="catalog-modal-type-chip" id="catalogoModalTipoChip">TIPO</div>
+          <div id="catalogoParentWrap" class="mt-3" style="display: none;">
+            <label class="form-label">Categoría padre</label>
+            <input type="text" id="catalogoModalParentLabel" class="form-control" readonly>
+            <small class="field-hint" id="catalogoParentHint">Se creará dentro de esta categoría.</small>
+          </div>
+          <label class="form-label mt-3">Valor</label>
+          <input type="text" name="valor" id="catalogoModalValor" class="form-control" placeholder="Escribe el valor" required>
+          <button type="button" id="catalogoCrearPadreBtn" class="btn btn-outline-primary btn-sm mt-3" style="display: none;">
+            <i class="bi bi-diagram-3"></i> Crear categoría padre primero
+          </button>
+          <small class="field-hint">Se guardará en mayúsculas automáticamente.</small>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check2"></i> Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  function exportarModuloPDF() {
+    window.print();
+  }
+
+  function exportarProyectoPDF() {
+    document.body.classList.add('print-project-almacen');
+    window.print();
+    setTimeout(function() {
+      document.body.classList.remove('print-project-almacen');
+    }, 250);
+  }
+
+  (function initAsignacionForm() {
+    var materialCatalog = document.getElementById('materialBaseCatalog');
+    var materialIdInput = document.getElementById('materialBaseId');
+    var materialSearchInput = document.getElementById('materialBaseSearch');
+    var suggestions = document.getElementById('materialBaseSuggestions');
+    var descInput = document.getElementById('materialDescripcion');
+    var unidadInput = document.getElementById('materialUnidad');
+    var cantidadInput = document.getElementById('asigCantidad');
+    var precioInput = document.getElementById('asigPrecio');
+    var importeInput = document.getElementById('asigImporte');
+
+    if (!materialCatalog || !materialIdInput || !materialSearchInput || !suggestions || !descInput || !unidadInput || !cantidadInput || !precioInput || !importeInput) {
+      return;
+    }
+
+    var materials = Array.prototype.slice.call(materialCatalog.options)
+      .filter(function(opt) { return opt.value; })
+      .map(function(opt) {
+        return {
+          id: String(opt.value),
+          label: String(opt.getAttribute('data-label') || opt.textContent || '').toUpperCase(),
+          nombre: String(opt.getAttribute('data-nombre') || '').toUpperCase(),
+          unidad: String(opt.getAttribute('data-unidad') || '-').toUpperCase(),
+          costo: Number(opt.getAttribute('data-costo') || 0)
+        };
+      });
+
+    var selectedMaterial = null;
+
+    function clearSuggestions() {
+      suggestions.innerHTML = '';
+      suggestions.classList.remove('open');
+    }
+
+    function renderSuggestions(items) {
+      clearSuggestions();
+      if (!items.length) {
+        return;
+      }
+
+      var fragment = document.createDocumentFragment();
+      items.slice(0, 25).forEach(function(item) {
+        var option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'live-search-item';
+        option.textContent = item.label;
+        option.addEventListener('click', function() {
+          selectedMaterial = item;
+          materialIdInput.value = item.id;
+          materialSearchInput.value = item.label;
+          descInput.value = item.nombre;
+          unidadInput.value = item.unidad;
+          if (precioInput.value === '' && item.costo > 0) {
+            precioInput.value = item.costo.toFixed(2);
+          }
+          syncImporte();
+          clearSuggestions();
+        });
+        fragment.appendChild(option);
+      });
+
+      suggestions.appendChild(fragment);
+      suggestions.classList.add('open');
+    }
+
+    function findMaterialById(id) {
+      return materials.find(function(item) { return item.id === String(id); }) || null;
+    }
+
+    function syncFromSelectedMaterial() {
+      if (!selectedMaterial) {
+        descInput.value = '';
+        unidadInput.value = '-';
+        return;
+      }
+      descInput.value = selectedMaterial.nombre;
+      unidadInput.value = selectedMaterial.unidad;
+      if (precioInput.value === '' && selectedMaterial.costo > 0) {
+        precioInput.value = selectedMaterial.costo.toFixed(2);
+      }
+      syncImporte();
+    }
+
+    function syncImporte() {
+      var cant = Number(cantidadInput.value || 0);
+      var precio = Number(precioInput.value || 0);
+      importeInput.value = 'S/ ' + (cant * precio).toFixed(2);
+    }
+
+    materialSearchInput.addEventListener('input', function() {
+      var term = String(materialSearchInput.value || '').trim().toUpperCase();
+      selectedMaterial = null;
+      materialIdInput.value = '';
+
+      if (!term) {
+        clearSuggestions();
+        descInput.value = '';
+        unidadInput.value = '-';
+        syncImporte();
+        return;
+      }
+
+      var matched = materials.filter(function(item) {
+        return item.label.indexOf(term) !== -1 || item.nombre.indexOf(term) !== -1;
+      });
+
+      renderSuggestions(matched);
+    });
+
+    materialSearchInput.addEventListener('blur', function() {
+      setTimeout(clearSuggestions, 150);
+    });
+
+    materialSearchInput.addEventListener('focus', function() {
+      var term = String(materialSearchInput.value || '').trim().toUpperCase();
+      if (!term) return;
+      var matched = materials.filter(function(item) {
+        return item.label.indexOf(term) !== -1 || item.nombre.indexOf(term) !== -1;
+      });
+      renderSuggestions(matched);
+    });
+
+    cantidadInput.addEventListener('input', syncImporte);
+    precioInput.addEventListener('input', syncImporte);
+
+    if (materialIdInput.value) {
+      selectedMaterial = findMaterialById(materialIdInput.value);
+      if (selectedMaterial) {
+        materialSearchInput.value = selectedMaterial.label;
+      }
+    }
+
+    syncFromSelectedMaterial();
+
+    var form = document.getElementById('formAsignacionProyecto');
+    if (form) {
+      form.addEventListener('submit', function(e) {
+        if (!materialIdInput.value) {
+          e.preventDefault();
+          materialSearchInput.focus();
+        }
+      });
+    }
+  })();
+
+  (function initMovimientosForm() {
+    var proyectoFiltro = document.getElementById('movProyectoFiltro');
+    var select = document.getElementById('asignacionMovimientoSelect');
+    var tipoSelect = document.getElementById('movTipo');
+    var motivoSelect = document.getElementById('movMotivo');
+    var cantidadInput = document.getElementById('movCantidad');
+    var documentoRefInput = document.getElementById('movDocumentoRef');
+    var destinoWrap = document.getElementById('movDestinoWrap');
+    var responsableWrap = document.getElementById('movResponsableWrap');
+    var destinoInput = document.getElementById('movDestinoFrente');
+    var responsableInput = document.getElementById('movResponsable');
+    var validacionStock = document.getElementById('movValidacionStock');
+    var submitBtn = document.getElementById('btnRegistrarMovimiento');
+    var materialHidden = document.getElementById('movMaterialId');
+    var proyectoHidden = document.getElementById('movProyectoId');
+    var unidadInput = document.getElementById('movUnidad');
+    var meta = document.getElementById('movimientoMeta');
+
+    if (!proyectoFiltro || !select || !tipoSelect || !motivoSelect || !cantidadInput || !documentoRefInput || !destinoWrap || !responsableWrap || !destinoInput || !responsableInput || !validacionStock || !submitBtn || !materialHidden || !proyectoHidden || !unidadInput || !meta) {
+      return;
+    }
+
+    var dynamicOptionSelector = 'option[data-material-id][data-proyecto-id]';
+    var cachedOptions = Array.prototype.slice.call(select.querySelectorAll(dynamicOptionSelector)).map(function(opt) {
+      return {
+        value: opt.value,
+        text: opt.textContent,
+        materialId: opt.getAttribute('data-material-id') || '',
+        proyectoId: opt.getAttribute('data-proyecto-id') || '',
+        material: opt.getAttribute('data-material') || '-',
+        proyecto: opt.getAttribute('data-proyecto') || '-',
+        unidad: opt.getAttribute('data-unidad') || '-',
+        saldo: Number(opt.getAttribute('data-saldo') || 0)
+      };
+    });
+
+    var motivosByTipo = {
+      Ingreso: ['COMPRA LOCAL', 'TRASLADO ENTRE OBRAS', 'DEVOLUCION'],
+      Salida: ['CONSUMO OBRA', 'TRASLADO ENTRE OBRAS', 'MERMA', 'AJUSTE INVENTARIO', 'OTRO']
+    };
+
+    function syncMotivos() {
+      var tipo = tipoSelect.value;
+      var list = motivosByTipo[tipo] || [];
+      var currentValue = motivoSelect.value;
+
+      motivoSelect.innerHTML = '<option value="">Selecciona motivo</option>';
+      list.forEach(function(item) {
+        var option = document.createElement('option');
+        option.value = item;
+        option.textContent = item;
+        motivoSelect.appendChild(option);
+      });
+
+      if (list.indexOf(currentValue) !== -1) {
+        motivoSelect.value = currentValue;
+      }
+    }
+
+    function syncFlowByTipo() {
+      var isSalida = tipoSelect.value === 'Salida';
+      destinoWrap.style.display = isSalida ? '' : 'none';
+      responsableWrap.style.display = isSalida ? '' : 'none';
+      destinoInput.required = isSalida;
+      responsableInput.required = isSalida;
+      documentoRefInput.required = !isSalida;
+      if (!isSalida) {
+        destinoInput.value = '';
+        responsableInput.value = '';
+      }
+      syncMotivos();
+      validarStockSalida();
+    }
+
+    function getSaldoDisponible() {
+      var opt = select.options[select.selectedIndex];
+      return Number(opt ? (opt.getAttribute('data-saldo') || 0) : 0);
+    }
+
+    function validarStockSalida() {
+      var isSalida = tipoSelect.value === 'Salida';
+      var qty = Number(cantidadInput.value || 0);
+      var saldo = getSaldoDisponible();
+      var hasAsignacion = Boolean(materialHidden.value && proyectoHidden.value);
+
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('btn-danger');
+      submitBtn.classList.add('btn-primary');
+      validacionStock.classList.remove('text-danger');
+      validacionStock.textContent = '';
+
+      if (!hasAsignacion) {
+        submitBtn.disabled = true;
+        validacionStock.textContent = 'Selecciona proyecto y asignacion valida para continuar.';
+        return;
+      }
+
+      if (isSalida && qty > saldo) {
+        submitBtn.disabled = true;
+        submitBtn.classList.remove('btn-primary');
+        submitBtn.classList.add('btn-danger');
+        validacionStock.classList.add('text-danger');
+        validacionStock.textContent = 'Stock insuficiente para salida. Saldo actual: ' + saldo.toFixed(2) + ' ' + unidadInput.value;
+      }
+    }
+
+    function rebuildAsignaciones(proyectoId) {
+      while (select.options.length > 1) {
+        select.remove(1);
+      }
+
+      if (!proyectoId) {
+        select.value = '';
+        syncAsignacion();
+        return;
+      }
+
+      var filtered = cachedOptions.filter(function(item) {
+        return String(item.proyectoId) === String(proyectoId);
+      });
+
+      filtered.forEach(function(item) {
+        var option = document.createElement('option');
+        option.value = item.value;
+        option.textContent = item.text;
+        option.setAttribute('data-material-id', item.materialId);
+        option.setAttribute('data-proyecto-id', item.proyectoId);
+        option.setAttribute('data-material', item.material);
+        option.setAttribute('data-proyecto', item.proyecto);
+        option.setAttribute('data-unidad', item.unidad);
+        option.setAttribute('data-saldo', String(item.saldo));
+        select.appendChild(option);
+      });
+
+      if (filtered.length) {
+        select.selectedIndex = 1;
+      } else {
+        select.selectedIndex = 0;
+      }
+      syncAsignacion();
+    }
+
+    function syncAsignacion() {
+      var opt = select.options[select.selectedIndex];
+      var materialId = opt ? (opt.getAttribute('data-material-id') || '') : '';
+      var proyectoId = opt ? (opt.getAttribute('data-proyecto-id') || '') : '';
+      var material = opt ? (opt.getAttribute('data-material') || '-') : '-';
+      var proyecto = opt ? (opt.getAttribute('data-proyecto') || '-') : '-';
+      var unidad = opt ? (opt.getAttribute('data-unidad') || '-') : '-';
+      var saldo = Number(opt ? (opt.getAttribute('data-saldo') || 0) : 0);
+
+      materialHidden.value = materialId;
+      proyectoHidden.value = proyectoId;
+      unidadInput.value = unidad;
+
+      if (!proyectoFiltro.value) {
+        meta.textContent = 'Selecciona un proyecto para trabajar con sus movimientos.';
+        return;
+      }
+
+      if (!materialId || !proyectoId) {
+        meta.textContent = 'Proyecto: ' + proyecto + ' | Sin asignaciones activas para registrar movimientos.';
+        validarStockSalida();
+        return;
+      }
+
+      meta.textContent = 'Proyecto: ' + proyecto + ' | Material: ' + material + ' | Saldo actual: ' + saldo.toFixed(2) + ' ' + unidad;
+      validarStockSalida();
+    }
+
+    proyectoFiltro.addEventListener('change', function() {
+      rebuildAsignaciones(proyectoFiltro.value);
+    });
+    select.addEventListener('change', syncAsignacion);
+    tipoSelect.addEventListener('change', syncFlowByTipo);
+    cantidadInput.addEventListener('input', validarStockSalida);
+
+    if (cachedOptions.length) {
+      proyectoFiltro.value = cachedOptions[0].proyectoId;
+      rebuildAsignaciones(proyectoFiltro.value);
+    } else {
+      syncAsignacion();
+    }
+
+    syncFlowByTipo();
+  })();
+
+  (function initCatalogQuickAdd() {
+    var modalEl = document.getElementById('catalogoModal');
+    var form = document.getElementById('catalogoModalForm');
+    var tipoInput = document.getElementById('catalogoModalTipo');
+    var parentTipoInput = document.getElementById('catalogoModalParentTipo');
+    var parentValorInput = document.getElementById('catalogoModalParentValor');
+    var tipoChip = document.getElementById('catalogoModalTipoChip');
+    var valorInput = document.getElementById('catalogoModalValor');
+    var titleEl = document.getElementById('catalogoModalTitle');
+    var parentWrap = document.getElementById('catalogoParentWrap');
+    var parentLabel = document.getElementById('catalogoModalParentLabel');
+    var crearPadreBtn = document.getElementById('catalogoCrearPadreBtn');
+    var familiaSelect = document.getElementById('catalogFamiliaSelect');
+    var grupoSelect = document.getElementById('catalogGrupoSelect');
+    var subgrupoSelect = document.getElementById('catalogSubgrupoSelect');
+    var unidadSelect = document.getElementById('catalogUnidadSelect');
+
+    if (!modalEl || !form || !tipoInput || !parentTipoInput || !parentValorInput || !tipoChip || !valorInput || !titleEl || !parentWrap || !parentLabel || !crearPadreBtn || !familiaSelect || !grupoSelect || !subgrupoSelect || !unidadSelect) {
+      return;
+    }
+
+    var modal = null;
+    var currentMode = { tipo: '', parentTipo: '', parentValor: '' };
+    var gruposCatalogo = Array.prototype.slice.call(grupoSelect.options).slice(1).map(function(opt) {
+      return {
+        value: String(opt.value || '').toUpperCase(),
+        parentFamilia: String(opt.getAttribute('data-parent-familia') || '').toUpperCase()
+      };
+    });
+    var subgruposCatalogo = Array.prototype.slice.call(subgrupoSelect.options).slice(1).map(function(opt) {
+      return {
+        value: String(opt.value || '').toUpperCase(),
+        parentGrupo: String(opt.getAttribute('data-parent-grupo') || '').toUpperCase()
+      };
+    });
+
+    function mapTipoLabel(tipo) {
+      var map = {
+        FAMILIA: 'Familia',
+        GRUPO: 'Grupo',
+        SUBGRUPO: 'Subgrupo',
+        UNIDAD: 'Unidad'
+      };
+      return map[tipo] || 'Catálogo';
+    }
+
+    function normalize(value) {
+      return String(value || '').trim().toUpperCase();
+    }
+
+    function ensureOption(select, value, dataAttrs) {
+      var normalizedValue = normalize(value);
+      if (!normalizedValue) return;
+
+      var existing = Array.prototype.slice.call(select.options).find(function(opt) {
+        if (normalize(opt.value) !== normalizedValue) return false;
+        if (!dataAttrs) return true;
+        if (dataAttrs.parentFamilia !== undefined && normalize(opt.getAttribute('data-parent-familia') || '') !== normalize(dataAttrs.parentFamilia)) return false;
+        if (dataAttrs.parentGrupo !== undefined && normalize(opt.getAttribute('data-parent-grupo') || '') !== normalize(dataAttrs.parentGrupo)) return false;
+        return true;
+      });
+
+      if (existing) {
+        return;
+      }
+
+      var option = document.createElement('option');
+      option.value = normalizedValue;
+      option.textContent = normalizedValue;
+      if (dataAttrs && dataAttrs.parentFamilia !== undefined) {
+        option.setAttribute('data-parent-familia', normalize(dataAttrs.parentFamilia));
+      }
+      if (dataAttrs && dataAttrs.parentGrupo !== undefined) {
+        option.setAttribute('data-parent-grupo', normalize(dataAttrs.parentGrupo));
+      }
+      select.appendChild(option);
+    }
+
+    function rebuildGrupoOptions() {
+      var selectedFamilia = normalize(familiaSelect.value);
+      var prevGrupo = normalize(grupoSelect.value);
+      grupoSelect.innerHTML = '<option value="">Selecciona grupo</option>';
+
+      gruposCatalogo
+        .filter(function(item) {
+          return !selectedFamilia || !item.parentFamilia || item.parentFamilia === selectedFamilia;
+        })
+        .sort(function(a, b) { return a.value.localeCompare(b.value); })
+        .forEach(function(item) {
+          var option = document.createElement('option');
+          option.value = item.value;
+          option.textContent = item.value;
+          option.setAttribute('data-parent-familia', item.parentFamilia);
+          grupoSelect.appendChild(option);
+        });
+
+      if (prevGrupo && Array.prototype.slice.call(grupoSelect.options).some(function(opt) { return normalize(opt.value) === prevGrupo; })) {
+        grupoSelect.value = prevGrupo;
+      } else {
+        grupoSelect.value = '';
+      }
+    }
+
+    function rebuildSubgrupoOptions() {
+      var selectedGrupo = normalize(grupoSelect.value);
+      var prevSubgrupo = normalize(subgrupoSelect.value);
+      subgrupoSelect.innerHTML = '<option value="">Selecciona subgrupo</option>';
+
+      subgruposCatalogo
+        .filter(function(item) {
+          return !selectedGrupo || !item.parentGrupo || item.parentGrupo === selectedGrupo;
+        })
+        .sort(function(a, b) { return a.value.localeCompare(b.value); })
+        .forEach(function(item) {
+          var option = document.createElement('option');
+          option.value = item.value;
+          option.textContent = item.value;
+          option.setAttribute('data-parent-grupo', item.parentGrupo);
+          subgrupoSelect.appendChild(option);
+        });
+
+      if (prevSubgrupo && Array.prototype.slice.call(subgrupoSelect.options).some(function(opt) { return normalize(opt.value) === prevSubgrupo; })) {
+        subgrupoSelect.value = prevSubgrupo;
+      } else {
+        subgrupoSelect.value = '';
+      }
+    }
+
+    function openCatalogModal(tipo, parentTipo, parentValor) {
+      currentMode = {
+        tipo: tipo,
+        parentTipo: parentTipo || '',
+        parentValor: normalize(parentValor || '')
+      };
+
+      tipoInput.value = currentMode.tipo;
+      parentTipoInput.value = currentMode.parentTipo;
+      parentValorInput.value = currentMode.parentValor;
+      tipoChip.textContent = currentMode.tipo;
+      titleEl.textContent = 'Nueva opción de ' + mapTipoLabel(currentMode.tipo);
+      valorInput.value = '';
+
+      if (currentMode.parentTipo && currentMode.parentValor) {
+        parentWrap.style.display = '';
+        parentLabel.value = mapTipoLabel(currentMode.parentTipo) + ': ' + currentMode.parentValor;
+      } else {
+        parentWrap.style.display = 'none';
+        parentLabel.value = '';
+      }
+
+      crearPadreBtn.style.display = (currentMode.tipo === 'SUBGRUPO') ? '' : 'none';
+
+      modal = modal || new window.bootstrap.Modal(modalEl);
+      modal.show();
+      setTimeout(function() { valorInput.focus(); }, 80);
+    }
+
+    familiaSelect.addEventListener('change', function() {
+      rebuildGrupoOptions();
+      rebuildSubgrupoOptions();
+    });
+
+    grupoSelect.addEventListener('change', function() {
+      rebuildSubgrupoOptions();
+    });
+
+    document.querySelectorAll('.catalog-add-btn').forEach(function(button) {
+      button.addEventListener('click', function() {
+        var tipo = String(button.getAttribute('data-catalog-type') || '').toUpperCase();
+        var familiaSel = normalize(familiaSelect.value);
+        var grupoSel = normalize(grupoSelect.value);
+
+        if (tipo === 'GRUPO' && !familiaSel) {
+          mostrarToastProveedor('Selecciona primero una familia para crear un grupo.', 'warning');
+          familiaSelect.focus();
+          return;
+        }
+
+        if (tipo === 'SUBGRUPO' && !grupoSel) {
+          if (familiaSel) {
+            mostrarToastProveedor('Primero crea o selecciona un grupo dentro de la familia actual.', 'warning');
+            openCatalogModal('GRUPO', 'FAMILIA', familiaSel);
+            return;
+          }
+          mostrarToastProveedor('Selecciona primero una familia y un grupo para crear subgrupo.', 'warning');
+          familiaSelect.focus();
+          return;
+        }
+
+        if (tipo === 'FAMILIA' || tipo === 'UNIDAD') {
+          openCatalogModal(tipo, '', '');
+          return;
+        }
+
+        if (tipo === 'GRUPO') {
+          openCatalogModal('GRUPO', 'FAMILIA', familiaSel);
+          return;
+        }
+
+        if (tipo === 'SUBGRUPO') {
+          openCatalogModal('SUBGRUPO', 'GRUPO', grupoSel);
+        }
+      });
+    });
+
+    crearPadreBtn.addEventListener('click', function() {
+      var familiaSel = normalize(familiaSelect.value);
+      if (!familiaSel) {
+        mostrarToastProveedor('Selecciona primero una familia para crear el grupo padre.', 'warning');
+        modal && modal.hide();
+        familiaSelect.focus();
+        return;
+      }
+      openCatalogModal('GRUPO', 'FAMILIA', familiaSel);
+    });
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var payload = {
+        tipo: currentMode.tipo,
+        valor: normalize(valorInput.value),
+        parent_tipo: currentMode.parentTipo,
+        parent_valor: currentMode.parentValor
+      };
+
+      if (!payload.valor) {
+        mostrarToastProveedor('Debes ingresar un valor para el catálogo.', 'warning');
+        valorInput.focus();
+        return;
+      }
+
+      fetch('/almacen/catalogos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (!data.success) {
+            throw new Error(data.error || 'No se pudo guardar el catálogo.');
+          }
+
+          var tipo = normalize(data.tipo);
+          var valor = normalize(data.valor);
+          var parentValor = normalize(data.parent_valor || '');
+
+          if (tipo === 'FAMILIA') {
+            ensureOption(familiaSelect, valor);
+            familiaSelect.value = valor;
+            rebuildGrupoOptions();
+            rebuildSubgrupoOptions();
+          }
+
+          if (tipo === 'GRUPO') {
+            gruposCatalogo.push({ value: valor, parentFamilia: parentValor });
+            ensureOption(grupoSelect, valor, { parentFamilia: parentValor });
+            if (parentValor) {
+              ensureOption(familiaSelect, parentValor);
+              familiaSelect.value = parentValor;
+            }
+            rebuildGrupoOptions();
+            grupoSelect.value = valor;
+            rebuildSubgrupoOptions();
+          }
+
+          if (tipo === 'SUBGRUPO') {
+            subgruposCatalogo.push({ value: valor, parentGrupo: parentValor });
+            ensureOption(subgrupoSelect, valor, { parentGrupo: parentValor });
+            if (parentValor) {
+              ensureOption(grupoSelect, parentValor, { parentFamilia: normalize(familiaSelect.value) });
+              grupoSelect.value = parentValor;
+            }
+            rebuildSubgrupoOptions();
+            subgrupoSelect.value = valor;
+          }
+
+          if (tipo === 'UNIDAD') {
+            ensureOption(unidadSelect, valor);
+            unidadSelect.value = valor;
+          }
+
+          modal && modal.hide();
+          mostrarToastProveedor('Catálogo actualizado: ' + valor, 'success');
+        })
+        .catch(function(error) {
+          mostrarToastProveedor(error.message || 'No se pudo guardar el catálogo.', 'error');
+        });
+    });
+
+    valorInput.addEventListener('input', function() {
+      valorInput.value = String(valorInput.value || '').toUpperCase();
+    });
+
+    rebuildGrupoOptions();
+    rebuildSubgrupoOptions();
+  })();
+
+  (function initCatalogFilters() {
+    var codigoFilter = document.getElementById('filtroCatalogoCodigo');
+    var materialFilter = document.getElementById('filtroCatalogoMaterial');
+    var classFilter = document.getElementById('filtroCatalogoClasificacion');
+    var table = document.getElementById('tablaCatalogoMateriales');
+    if (!codigoFilter || !materialFilter || !classFilter || !table) {
+      return;
+    }
+
+    var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr'))
+      .filter(function(row) { return row.dataset && row.dataset.codigo !== undefined; });
+
+    function normalize(value) {
+      return String(value || '').trim().toUpperCase();
+    }
+
+    function applyFilter() {
+      var codigoValue = normalize(codigoFilter.value);
+      var materialValue = normalize(materialFilter.value);
+      var classValue = normalize(classFilter.value);
+
+      rows.forEach(function(row) {
+        var codigo = normalize(row.dataset.codigo);
+        var material = normalize(row.dataset.material);
+        var familia = normalize(row.dataset.familia);
+        var grupo = normalize(row.dataset.grupo);
+        var subgrupo = normalize(row.dataset.subgrupo);
+
+        var matchCodigo = !codigoValue || codigo.indexOf(codigoValue) !== -1;
+        var matchMaterial = !materialValue || material.indexOf(materialValue) !== -1;
+        var matchClass = !classValue || familia.indexOf(classValue) !== -1 || grupo.indexOf(classValue) !== -1 || subgrupo.indexOf(classValue) !== -1;
+
+        row.style.display = (matchCodigo && matchMaterial && matchClass) ? '' : 'none';
+      });
+    }
+
+    codigoFilter.addEventListener('input', applyFilter);
+    materialFilter.addEventListener('input', applyFilter);
+    classFilter.addEventListener('input', applyFilter);
+  })();
+
+  (function initProyectoFilters() {
+    var codigoFilter = document.getElementById('filtroProyectoCodigo');
+    var materialFilter = document.getElementById('filtroProyectoMaterial');
+    var classFilter = document.getElementById('filtroProyectoClasificacion');
+    var table = document.getElementById('tablaProyectoMateriales');
+    if (!codigoFilter || !materialFilter || !classFilter || !table) {
+      return;
+    }
+
+    var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr'))
+      .filter(function(row) { return row.dataset && row.dataset.codigo !== undefined; });
+
+    function normalize(value) {
+      return String(value || '').trim().toUpperCase();
+    }
+
+    function applyFilter() {
+      var codigoValue = normalize(codigoFilter.value);
+      var materialValue = normalize(materialFilter.value);
+      var classValue = normalize(classFilter.value);
+
+      rows.forEach(function(row) {
+        var codigo = normalize(row.dataset.codigo);
+        var material = normalize(row.dataset.material);
+        var familia = normalize(row.dataset.familia);
+        var grupo = normalize(row.dataset.grupo);
+        var subgrupo = normalize(row.dataset.subgrupo);
+
+        var matchCodigo = !codigoValue || codigo.indexOf(codigoValue) !== -1;
+        var matchMaterial = !materialValue || material.indexOf(materialValue) !== -1;
+        var matchClass = !classValue || familia.indexOf(classValue) !== -1 || grupo.indexOf(classValue) !== -1 || subgrupo.indexOf(classValue) !== -1;
+
+        row.style.display = (matchCodigo && matchMaterial && matchClass) ? '' : 'none';
+      });
+    }
+
+    codigoFilter.addEventListener('input', applyFilter);
+    materialFilter.addEventListener('input', applyFilter);
+    classFilter.addEventListener('input', applyFilter);
+  })();
+
+  let proveedorPendienteEliminar = null;
+
+  function mostrarToastProveedor(mensaje, tipo) {
+    const toastType = tipo === 'error' ? 'danger' : (tipo === 'warning' ? 'warning' : 'success');
+    let container = document.getElementById('toastProveedoresContainer');
+
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toastProveedoresContainer';
+      container.className = 'toast-container position-fixed top-0 end-0 p-3';
+      container.style.zIndex = '2000';
+      document.body.appendChild(container);
+    }
+
+    const toastEl = document.createElement('div');
+    toastEl.className = 'toast align-items-center text-bg-' + toastType + ' border-0';
+    toastEl.setAttribute('role', 'alert');
+    toastEl.setAttribute('aria-live', 'assertive');
+    toastEl.setAttribute('aria-atomic', 'true');
+
+    toastEl.innerHTML = '<div class="d-flex">'
+      + '<div class="toast-body">' + String(mensaje || '') + '</div>'
+      + '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>'
+      + '</div>';
+
+    container.appendChild(toastEl);
+    const toast = new bootstrap.Toast(toastEl, { delay: 3200 });
+    toast.show();
+    toastEl.addEventListener('hidden.bs.toast', function() {
+      toastEl.remove();
+    });
+  }
+
+  function abrirListaProveedores() {
+    const modal = new bootstrap.Modal(document.getElementById('modalListaProveedores'));
+    cargarProveedores();
+    modal.show();
+  }
+
+  function cargarProveedores() {
+    const tbody = document.getElementById('tablaProveedoresBody');
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;"><i class="bi bi-hourglass-split"></i> Cargando...</td></tr>';
+
+    fetch('/almacen/proveedores/lista')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.proveedores)) {
+          renderTablaProveedores(data.proveedores);
+        } else {
+          tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><i class="bi bi-inbox"></i><p>No hay proveedores</p></div></td></tr>';
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><i class="bi bi-exclamation-triangle-fill"></i><p>Error al cargar proveedores</p></div></td></tr>';
+      });
+  }
+
+  function renderTablaProveedores(proveedores) {
+    const tbody = document.getElementById('tablaProveedoresBody');
+    tbody.innerHTML = '';
+
+    proveedores.forEach(prov => {
+      const fila = document.createElement('tr');
+      fila.innerHTML = `
+        <td><strong>${(prov.nombre || '-').toUpperCase()}</strong></td>
+        <td>${(prov.ruc || '-')}</td>
+        <td>${(prov.contacto || '-').toUpperCase()}</td>
+        <td>${(prov.telefono || '-')}</td>
+        <td>${(prov.email || '-').toLowerCase()}</td>
+        <td>${(prov.direccion || '-').toUpperCase()}</td>
+        <td>
+          <div class="d-flex gap-1" style="justify-content: center;">
+            <button class="btn btn-xs btn-primary" onclick="editarProveedor(${prov.id})" title="Editar">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-xs btn-outline-danger" onclick="eliminarProveedor(${prov.id}, '${(prov.nombre || 'Proveedor').replace(/'/g, "\\'")}')" title="Eliminar">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(fila);
+    });
+  }
+
+  function editarProveedor(id) {
+    fetch('/almacen/proveedores/lista')
+      .then(res => res.json())
+      .then(data => {
+        const proveedor = data.proveedores.find(p => p.id === id);
+        if (proveedor) {
+          document.getElementById('editProveedorId').value = proveedor.id;
+          document.getElementById('editProveedorNombre').value = proveedor.nombre || '';
+          document.getElementById('editProveedorRuc').value = proveedor.ruc || '';
+          document.getElementById('editProveedorContacto').value = proveedor.contacto || '';
+          document.getElementById('editProveedorTelefono').value = proveedor.telefono || '';
+          document.getElementById('editProveedorEmail').value = proveedor.email || '';
+          document.getElementById('editProveedorDireccion').value = proveedor.direccion || '';
+          
+          const modal = new bootstrap.Modal(document.getElementById('modalEditarProveedor'));
+          modal.show();
+        } else {
+          mostrarToastProveedor('Proveedor no encontrado.', 'warning');
+        }
+      })
+      .catch(error => mostrarToastProveedor('Error: ' + error.message, 'error'));
+  }
+
+  function guardarEdicionProveedor() {
+    const id = document.getElementById('editProveedorId').value;
+    const nombre = document.getElementById('editProveedorNombre').value;
+    const ruc = document.getElementById('editProveedorRuc').value;
+    const contacto = document.getElementById('editProveedorContacto').value;
+    const telefono = document.getElementById('editProveedorTelefono').value;
+    const email = document.getElementById('editProveedorEmail').value;
+    const direccion = document.getElementById('editProveedorDireccion').value;
+
+    if (!nombre.trim()) {
+      mostrarToastProveedor('El nombre es obligatorio.', 'warning');
+      return;
+    }
+    if (!ruc.trim()) {
+      mostrarToastProveedor('El RUC es obligatorio.', 'warning');
+      return;
+    }
+
+    fetch('/almacen/proveedores/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, ruc, contacto, telefono, email, direccion })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          mostrarToastProveedor('Proveedor actualizado correctamente.', 'success');
+          bootstrap.Modal.getInstance(document.getElementById('modalEditarProveedor')).hide();
+          cargarProveedores();
+        } else {
+          mostrarToastProveedor('Error: ' + (data.error || 'No se pudo actualizar'), 'error');
+        }
+      })
+      .catch(error => mostrarToastProveedor('Error: ' + error.message, 'error'));
+  }
+
+  function eliminarProveedor(id, nombre) {
+    proveedorPendienteEliminar = id;
+    const nameEl = document.getElementById('nombreProveedorEliminar');
+    if (nameEl) {
+      nameEl.textContent = String(nombre || 'PROVEEDOR').toUpperCase();
+    }
+    const confirmEl = document.getElementById('modalConfirmarEliminarProveedor');
+    const listaEl = document.getElementById('modalListaProveedores');
+    const listaModal = bootstrap.Modal.getInstance(listaEl);
+
+    if (listaModal) {
+      listaEl.addEventListener('hidden.bs.modal', function onHidden() {
+        listaEl.removeEventListener('hidden.bs.modal', onHidden);
+        const confirmModal = new bootstrap.Modal(confirmEl);
+        confirmModal.show();
+      });
+      listaModal.hide();
+      return;
+    }
+
+    const confirmModal = new bootstrap.Modal(confirmEl);
+    confirmModal.show();
+  }
+
+  function confirmarEliminarProveedor() {
+    if (!proveedorPendienteEliminar) {
+      return;
+    }
+
+    fetch('/almacen/proveedores/' + proveedorPendienteEliminar, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          mostrarToastProveedor('Proveedor eliminado correctamente.', 'success');
+          cargarProveedores();
+          const modalEl = document.getElementById('modalConfirmarEliminarProveedor');
+          const modal = bootstrap.Modal.getInstance(modalEl);
+          if (modal) {
+            modal.hide();
+          }
+          abrirListaProveedores();
+        } else {
+          mostrarToastProveedor('Error: ' + (data.error || 'No se pudo eliminar'), 'error');
+        }
+      })
+      .catch(error => mostrarToastProveedor('Error: ' + error.message, 'error'))
+      .finally(() => {
+        proveedorPendienteEliminar = null;
+      });
+  }
+</script>
+
+<div class="modal fade" id="modalListaProveedores" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="border-bottom: 2px solid #e5e7eb; background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);">
+        <h5 class="modal-title" style="font-weight: 600; color: #111827;">
+          <i class="bi bi-list-check" style="color: #10b981; margin-right: 8px;"></i>Lista de Proveedores
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead style="background: #f9fafb; position: sticky; top: 0;">
+              <tr>
+                <th style="color: #374151; font-weight: 600; font-size: 12px; text-transform: uppercase;">Nombre</th>
+                <th style="color: #374151; font-weight: 600; font-size: 12px; text-transform: uppercase;">RUC</th>
+                <th style="color: #374151; font-weight: 600; font-size: 12px; text-transform: uppercase;">Contacto</th>
+                <th style="color: #374151; font-weight: 600; font-size: 12px; text-transform: uppercase;">Teléfono</th>
+                <th style="color: #374151; font-weight: 600; font-size: 12px; text-transform: uppercase;">Email</th>
+                <th style="color: #374151; font-weight: 600; font-size: 12px; text-transform: uppercase;">Dirección</th>
+                <th style="color: #374151; font-weight: 600; font-size: 12px; text-transform: uppercase; text-align: center;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tablaProveedoresBody">
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 20px;">
+                  <i class="bi bi-hourglass-split"></i> Cargando...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top: 1px solid #e5e7eb; background: #f9fafb;">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- Modal para editar proveedor -->
+  <div class="modal fade" id="modalEditarProveedor" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header" style="border-bottom: 2px solid #e5e7eb; background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);">
+          <h5 class="modal-title" style="font-weight: 600; color: #111827;">
+            <i class="bi bi-pencil-square" style="color: #3b82f6; margin-right: 8px;"></i>Editar Proveedor
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <form onsubmit="event.preventDefault(); guardarEdicionProveedor();">
+          <div class="modal-body">
+            <input type="hidden" id="editProveedorId">
+          
+            <div class="mb-3">
+              <label class="form-label" style="font-weight: 600; color: #374151;">Nombre</label>
+              <input type="text" class="form-control" id="editProveedorNombre" placeholder="Nombre proveedor" required>
+            </div>
+          
+            <div class="mb-3">
+              <label class="form-label" style="font-weight: 600; color: #374151;">RUC</label>
+              <input type="text" class="form-control" id="editProveedorRuc" placeholder="RUC proveedor" required>
+            </div>
+          
+            <div class="mb-3">
+              <label class="form-label" style="font-weight: 600; color: #374151;">Contacto</label>
+              <input type="text" class="form-control" id="editProveedorContacto" placeholder="Nombre contacto">
+            </div>
+          
+            <div class="mb-3">
+              <label class="form-label" style="font-weight: 600; color: #374151;">Teléfono</label>
+              <input type="text" class="form-control" id="editProveedorTelefono" placeholder="Teléfono">
+            </div>
+          
+            <div class="mb-3">
+              <label class="form-label" style="font-weight: 600; color: #374151;">Email</label>
+              <input type="email" class="form-control" id="editProveedorEmail" placeholder="Correo electrónico">
+            </div>
+          
+            <div class="mb-3">
+              <label class="form-label" style="font-weight: 600; color: #374151;">Dirección</label>
+              <textarea class="form-control" id="editProveedorDireccion" placeholder="Dirección" rows="3"></textarea>
+            </div>
+          </div>
+
+          <div class="modal-footer" style="border-top: 1px solid #e5e7eb; background: #f9fafb;">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle" style="margin-right: 4px;"></i>Guardar cambios
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalConfirmarEliminarProveedor" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header" style="border-bottom: 2px solid #e5e7eb; background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);">
+          <h5 class="modal-title" style="font-weight: 600; color: #9a3412;">
+            <i class="bi bi-exclamation-triangle" style="margin-right: 8px;"></i>Confirmar eliminación
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <p style="margin-bottom: 8px; color: #374151;">¿Seguro que deseas eliminar este proveedor?</p>
+          <p id="nombreProveedorEliminar" style="margin: 0; font-weight: 700; color: #111827;"></p>
+        </div>
+        <div class="modal-footer" style="border-top: 1px solid #e5e7eb; background: #f9fafb;">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-danger" onclick="confirmarEliminarProveedor()">
+            <i class="bi bi-trash" style="margin-right: 4px;"></i>Eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>

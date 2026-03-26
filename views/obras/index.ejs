@@ -1,0 +1,80 @@
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Obras y Proyectos</h1>
+    <p>Gestión y seguimiento de obras de construcción</p>
+  </div>
+  <% if (currentUser.role === 'admin') { %>
+    <a href="/obras/nuevo" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Nueva Obra
+    </a>
+  <% } %>
+</div>
+
+<div class="panel-card">
+  <div class="panel-card-header">
+    <div class="panel-title"><i class="bi bi-building"></i> Listado de obras</div>
+    <span class="badge badge-secondary"><%= obras.length %> registros</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle table-hover">
+      <thead>
+        <tr>
+          <th>Proyecto</th>
+          <th>Cliente</th>
+          <th>Ubicación</th>
+          <th>Período</th>
+          <th>Presupuesto</th>
+          <th>Estado</th>
+          <th style="text-align:center">Acts.</th>
+          <th>Avance</th>
+          <% if (currentUser.role === 'admin') { %><th>Acciones</th><% } %>
+        </tr>
+      </thead>
+      <tbody>
+        <% obras.forEach(item => { %>
+        <tr>
+          <td class="fw-semibold"><%= item.nombre %></td>
+          <td style="color:var(--muted);font-size:.84rem"><%= item.cliente %></td>
+          <td style="color:var(--muted);font-size:.84rem"><%= item.ubicacion %></td>
+          <td style="font-size:.8rem;white-space:nowrap">
+            <%= item.fecha_inicio?.toISOString().slice(0,10) %>&nbsp;&rarr;&nbsp;<%= item.fecha_fin?.toISOString().slice(0,10) %>
+          </td>
+          <td class="fw-semibold">S/ <%= Number(item.presupuesto).toLocaleString() %></td>
+          <td>
+            <span class="rounded-badge estado-<%= (item.estado||'').toLowerCase().replace(/\s+/g,'-') %>">
+              <%= item.estado %>
+            </span>
+          </td>
+          <td style="text-align:center"><%= item.total_actividades %></td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="progress" style="min-width:60px;flex:1">
+                <div class="progress-bar" style="width:<%= item.avance_real || 0 %>%"></div>
+              </div>
+              <small style="color:var(--muted);white-space:nowrap"><%= item.avance_real || 0 %>%</small>
+            </div>
+          </td>
+          <% if (currentUser.role === 'admin') { %>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="/obras/<%= item.id %>/editar" class="btn btn-xs btn-primary" title="Editar">
+                <i class="bi bi-pencil"></i>&nbsp;Editar
+              </a>
+              <form action="/obras/<%= item.id %>?_method=DELETE" method="post"
+                    onsubmit="return confirm('¿Eliminar esta obra? Esta acción puede afectar actividades relacionadas.')">
+                <button type="submit" class="btn btn-xs btn-outline-danger" title="Eliminar">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+          <% } %>
+        </tr>
+        <% }) %>
+        <% if (!obras.length) { %>
+          <tr><td colspan="9"><div class="empty-state"><i class="bi bi-building"></i><p>No hay obras registradas</p></div></td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>

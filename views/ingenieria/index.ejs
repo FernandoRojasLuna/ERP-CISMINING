@@ -1,0 +1,503 @@
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Ingeniería</h1>
+    <p>Registro de partidas, metrados y cálculo de materiales</p>
+  </div>
+  <div class="d-flex align-items-center gap-2 no-print">
+    <a class="btn btn-primary" href="/ingenieria/calculadora">
+      <i class="bi bi-calculator"></i> Calculadora de materiales
+    </a>
+    <button type="button" class="btn btn-export-pdf" onclick="exportarModuloPDF()">
+      <i class="bi bi-filetype-pdf"></i> Exportar a PDF
+    </button>
+  </div>
+</div>
+
+<%
+  const fechaReporte = new Date();
+  const totalPartidas = partidas.length;
+  const metradoTotal = partidas.reduce((acc, p) => acc + Number(p.metrado || 0), 0);
+  const rendimientoProm = totalPartidas
+    ? (partidas.reduce((acc, p) => acc + Number(p.rendimiento_planeado || 0), 0) / totalPartidas)
+    : 0;
+  const proyectosUnicos = new Set(partidas.map((p) => p.proyecto).filter(Boolean)).size;
+  const fmtFecha = (date) => {
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const partidaEditSafe = (typeof partidaEdit !== 'undefined' && partidaEdit) ? partidaEdit : null;
+
+  const proyectosListado = (typeof proyectos !== 'undefined' && Array.isArray(proyectos)) ? proyectos : [];
+  const filtrosAplicados = (typeof filtros !== 'undefined' && filtros) ? filtros : {};
+
+  const tonalidades = ['project-tone-1', 'project-tone-2', 'project-tone-3', 'project-tone-4', 'project-tone-5', 'project-tone-6'];
+  const projectGroups = [];
+  const groupMap = new Map();
+
+  partidas.forEach((item) => {
+    const proyectoNombre = item.proyecto || 'Sin proyecto';
+    if (!groupMap.has(proyectoNombre)) {
+      const group = {
+        nombre: proyectoNombre,
+        toneClass: tonalidades[projectGroups.length % tonalidades.length],
+        items: []
+      };
+      groupMap.set(proyectoNombre, group);
+      projectGroups.push(group);
+    }
+    groupMap.get(proyectoNombre).items.push(item);
+  });
+%>
+
+<section class="module-print-report print-only" aria-hidden="true">
+  <div class="module-print-banner">
+    <div class="module-print-brand">
+      <div class="module-print-logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64" role="img" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="14" fill="#0f172a"></rect>
+          <path d="M18 44V20h8l6 8 6-8h8v24h-8V33l-6 8-6-8v11h-8z" fill="#f8fafc"></path>
+          <rect x="12" y="48" width="40" height="5" rx="2.5" fill="#d4a017"></rect>
+        </svg>
+      </div>
+      <div>
+        <p class="module-print-company">Cismining</p>
+        <p class="module-print-system">ERP Construcción</p>
+      </div>
+    </div>
+    <div class="module-print-docmeta">
+      <span>DOC-INGENIERIA</span>
+      <strong>Version 1.0</strong>
+    </div>
+  </div>
+  <div class="module-print-head">
+    <div>
+      <p class="module-print-eyebrow">Documento corporativo</p>
+      <h2>Reporte Oficial de Ingenieria</h2>
+      <p>Partidas registradas, metrados y rendimiento planeado por proyecto.</p>
+    </div>
+    <div class="module-print-meta-right">
+      <div><strong>Emitido:</strong> <%= fmtFecha(fechaReporte) %></div>
+      <div><strong>Preparado por:</strong> <%= currentUser?.nombre || 'Sistema' %></div>
+      <div><strong>Total partidas:</strong> <%= totalPartidas %></div>
+    </div>
+  </div>
+
+  <div class="module-print-metrics">
+    <article><span>Partidas</span><strong><%= totalPartidas %></strong></article>
+    <article><span>Proyectos</span><strong><%= proyectosUnicos %></strong></article>
+    <article><span>Metrado total</span><strong><%= metradoTotal.toFixed(2) %></strong></article>
+    <article><span>Rend. promedio</span><strong><%= rendimientoProm.toFixed(2) %></strong></article>
+  </div>
+
+  <% if (!projectGroups.length) { %>
+    <table class="table table-sm module-print-table">
+      <tbody>
+        <tr><td class="text-center">Sin partidas registradas.</td></tr>
+      </tbody>
+    </table>
+  <% } %>
+
+  <% projectGroups.forEach((group) => { %>
+    <section class="module-project-block">
+      <div class="module-project-heading <%= group.toneClass %>">
+        <span><%= group.nombre %></span>
+        <strong><%= group.items.length %> partidas</strong>
+      </div>
+      <table class="table table-sm module-print-table">
+        <thead>
+          <tr>
+            <th>Partida</th>
+            <th>Unidad</th>
+            <th>Metrado</th>
+            <th>Rendimiento</th>
+            <th>Especialidad</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% group.items.forEach((item) => { %>
+            <tr>
+              <td><%= item.nombre %></td>
+              <td><%= item.unidad || '-' %></td>
+              <td><strong><%= Number(item.metrado || 0).toFixed(2) %></strong></td>
+              <td><%= Number(item.rendimiento_planeado || 0).toFixed(2) %></td>
+              <td><%= item.especialidad || '-' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+  <% }) %>
+
+  <div class="module-print-footer">
+    <div>
+      <span class="label">Preparado por:</span>
+      <strong><%= currentUser?.nombre || 'Sistema' %></strong>
+    </div>
+    <div>
+      <span class="label">Clasificacion:</span>
+      <strong>Uso Interno - Gestion de Proyecto</strong>
+    </div>
+  </div>
+</section>
+
+<div class="row g-3 no-print">
+  <% if (currentUser.role === 'admin') { %>
+  <div class="col-lg-5">
+    <div class="form-section">
+      <div class="form-section-title">
+        <i class="bi bi-<%= partidaEditSafe ? 'pencil' : 'plus-circle' %>"></i>
+        <%= partidaEditSafe ? 'Editar partida de ingeniería' : 'Registrar partida de ingeniería' %>
+      </div>
+      <div class="form-section-body">
+        <form action="<%= partidaEditSafe ? ('/ingenieria/partidas/' + partidaEditSafe.id + '?_method=PUT') : '/ingenieria/partidas' %>" method="post" class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Proyecto</label>
+            <select name="proyecto_id" class="form-select" required>
+              <option value="">Selecciona proyecto</option>
+              <% if (typeof proyectos !== 'undefined' && Array.isArray(proyectos)) { %>
+                <% proyectos.forEach(p => { %>
+                  <option value="<%= p.id %>" <%= Number(partidaEditSafe?.proyecto_id || 0) === Number(p.id) ? 'selected' : '' %>><%= p.nombre %></option>
+                <% }) %>
+              <% } %>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Nombre de partida</label>
+            <input name="nombre" class="form-control" required placeholder="Ej. Excavación masiva" value="<%= partidaEditSafe?.nombre || '' %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Unidad</label>
+            <input name="unidad" class="form-control" placeholder="m3, ml, m2" value="<%= partidaEditSafe?.unidad || '' %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Metrado</label>
+            <input type="number" step="0.01" name="metrado" class="form-control" placeholder="0.00" value="<%= partidaEditSafe?.metrado ?? '' %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Rendimiento planeado</label>
+            <input type="number" step="0.01" name="rendimiento_planeado" class="form-control" placeholder="0.00" value="<%= partidaEditSafe?.rendimiento_planeado ?? '' %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Especialidad</label>
+            <input name="especialidad" class="form-control" placeholder="Estructuras" value="<%= partidaEditSafe?.especialidad || '' %>">
+          </div>
+          <div class="col-12 d-flex gap-2">
+            <button class="btn btn-primary">
+              <i class="bi bi-check-lg"></i> <%= partidaEditSafe ? 'Actualizar partida' : 'Guardar partida' %>
+            </button>
+            <% if (partidaEditSafe) { %>
+              <a href="/ingenieria" class="btn btn-outline-secondary">
+                <i class="bi bi-x-lg"></i> Cancelar
+              </a>
+            <% } %>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="<%= currentUser.role === 'admin' ? 'col-lg-7' : 'col-12' %>">
+    <div class="form-section mb-3">
+      <div class="form-section-title"><i class="bi bi-funnel"></i> Filtros de partidas</div>
+      <div class="form-section-body">
+        <form method="get" action="/ingenieria" class="row g-2 align-items-end" id="filtroIngenieriaForm">
+          <div class="col-md-5">
+            <label class="form-label">Proyecto</label>
+            <select name="proyecto_id" class="form-select" id="filtroProyectoIngenieria">
+              <option value="0">Todos los proyectos</option>
+              <% proyectosListado.forEach((p) => { %>
+                <option value="<%= p.id %>" <%= Number(filtrosAplicados.proyecto_id || 0) === Number(p.id) ? 'selected' : '' %>><%= p.nombre %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Partida</label>
+            <input id="filtroPartidaIngenieria" name="partida" class="form-control" placeholder="Nombre de partida" value="<%= filtrosAplicados.partida || '' %>">
+          </div>
+          <div class="col-md-2 d-grid">
+            <button class="btn btn-primary"><i class="bi bi-search"></i></button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-table"></i> Partidas registradas</div>
+        <span class="badge badge-secondary"><%= partidas.length %> partidas</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle table-hover">
+          <thead>
+            <tr>
+              <th>Proyecto</th>
+              <th>Partida</th>
+              <th>Unidad</th>
+              <th>Metrado</th>
+              <th>Rendimiento</th>
+              <th>Especialidad</th>
+              <% if (currentUser.role === 'admin') { %><th>Acciones</th><% } %>
+            </tr>
+          </thead>
+          <tbody>
+            <% const colSpanPartidas = currentUser.role === 'admin' ? 7 : 6; %>
+            <% projectGroups.forEach((group, groupIndex) => { %>
+              <tr class="project-divider-row <%= group.toneClass %>" data-group-key="<%= groupIndex %>" data-proyecto-nombre="<%= group.nombre %>">
+                <td colspan="<%= colSpanPartidas %>">
+                  <div class="project-divider-content">
+                    <span class="project-divider-dot"></span>
+                    <strong><%= group.nombre %></strong>
+                    <span class="project-divider-count"><%= group.items.length %> partidas</span>
+                  </div>
+                </td>
+              </tr>
+
+              <% group.items.forEach((item) => { %>
+                <tr class="partida-row" data-group-key="<%= groupIndex %>" data-proyecto-id="<%= item.proyecto_id || '' %>" data-proyecto-nombre="<%= group.nombre %>" data-partida="<%= item.nombre || '' %>">
+                  <td style="color:var(--muted);font-size:.83rem"><%= item.proyecto || '—' %></td>
+                  <td class="fw-semibold"><%= item.nombre %></td>
+                  <td><%= item.unidad %></td>
+                  <td><%= item.metrado %></td>
+                  <td><%= item.rendimiento_planeado %></td>
+                  <td style="font-size:.83rem"><%= item.especialidad %></td>
+                  <% if (currentUser.role === 'admin') { %>
+                    <td>
+                      <div class="d-flex gap-1">
+                        <button
+                          type="button"
+                          class="btn btn-xs btn-primary btn-editar-partida"
+                          data-bs-toggle="modal"
+                          data-bs-target="#editarPartidaModal"
+                          data-id="<%= item.id %>"
+                          data-nombre="<%= (item.nombre || '').replace(/"/g, '&quot;') %>"
+                          data-proyecto-id="<%= item.proyecto_id || '' %>"
+                          data-unidad="<%= (item.unidad || '').replace(/"/g, '&quot;') %>"
+                          data-metrado="<%= item.metrado || 0 %>"
+                          data-rendimiento="<%= item.rendimiento_planeado || 0 %>"
+                          data-especialidad="<%= (item.especialidad || '').replace(/"/g, '&quot;') %>"
+                          title="Editar"
+                        >
+                          <i class="bi bi-pencil"></i>
+                        </button>
+                        <form action="/ingenieria/partidas/<%= item.id %>?_method=DELETE" method="post" onsubmit="return confirm('¿Eliminar esta partida?')">
+                          <button type="submit" class="btn btn-xs btn-outline-danger" title="Eliminar">
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        </form>
+                      </div>
+                    </td>
+                  <% } %>
+                </tr>
+              <% }) %>
+            <% }) %>
+
+            <% if (!partidas.length) { %>
+              <tr><td colspan="<%= colSpanPartidas %>"><div class="empty-state"><i class="bi bi-table"></i><p>Sin partidas registradas</p></div></td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para editar partida -->
+<div class="modal fade" id="editarPartidaModal" tabindex="-1" aria-labelledby="editarPartidaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editarPartidaLabel">Editar partida de ingeniería</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <form id="formularioEditarPartida" class="row g-3">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Proyecto</label>
+              <select name="proyecto_id" id="editProyectoId" class="form-select" required>
+                <option value="">Selecciona proyecto</option>
+                <% if (typeof proyectos !== 'undefined' && Array.isArray(proyectos)) { %>
+                  <% proyectos.forEach(p => { %>
+                    <option value="<%= p.id %>"><%= p.nombre %></option>
+                  <% }) %>
+                <% } %>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Nombre de partida</label>
+              <input type="text" name="nombre" id="editNombre" class="form-control" required placeholder="Ej. Excavación masiva">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Unidad</label>
+              <input type="text" name="unidad" id="editUnidad" class="form-control" placeholder="m3, ml, m2">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Metrado</label>
+              <input type="number" step="0.01" name="metrado" id="editMetrado" class="form-control" placeholder="0.00">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Rendimiento planeado</label>
+              <input type="number" step="0.01" name="rendimiento_planeado" id="editRendimiento" class="form-control" placeholder="0.00">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Especialidad</label>
+              <input type="text" name="especialidad" id="editEspecialidad" class="form-control" placeholder="Estructuras">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" id="btnGuardarPartida" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> Guardar cambios
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  let editandoPartidaId = null;
+
+  // Cuando el modal se abre, cargar datos desde el botón que lo disparó
+  document.getElementById('editarPartidaModal').addEventListener('show.bs.modal', function(event) {
+    const button = event.relatedTarget;
+    if (!button) return;
+
+    editandoPartidaId = button.dataset.id;
+    document.getElementById('editNombre').value = button.dataset.nombre || '';
+    document.getElementById('editProyectoId').value = button.dataset.proyectoId || '';
+    document.getElementById('editUnidad').value = button.dataset.unidad || '';
+    document.getElementById('editMetrado').value = button.dataset.metrado || '';
+    document.getElementById('editRendimiento').value = button.dataset.rendimiento || '';
+    document.getElementById('editEspecialidad').value = button.dataset.especialidad || '';
+  });
+
+  // Enviar formulario por AJAX
+  document.getElementById('formularioEditarPartida').addEventListener('submit', async function(event) {
+    event.preventDefault();
+    
+    if (!editandoPartidaId) {
+      alert('Error: No se identificó la partida a editar.');
+      return;
+    }
+
+    const datos = {
+      proyecto_id: document.getElementById('editProyectoId').value,
+      nombre: document.getElementById('editNombre').value,
+      unidad: document.getElementById('editUnidad').value,
+      metrado: document.getElementById('editMetrado').value,
+      rendimiento_planeado: document.getElementById('editRendimiento').value,
+      especialidad: document.getElementById('editEspecialidad').value
+    };
+
+    try {
+      const response = await fetch(`/ingenieria/partidas/${editandoPartidaId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(datos)
+      });
+
+      if (response.ok) {
+        // Cerrar el modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editarPartidaModal'));
+        modal.hide();
+        
+        // Recargar la página para ver los cambios
+        setTimeout(() => window.location.reload(), 500);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        alert('Error al guardar: ' + (errorData.error || 'Error desconocido'));
+      }
+    } catch (error) {
+      console.error('Error en la solicitud:', error);
+      alert('Error al guardar la partida: ' + error.message);
+    }
+  });
+
+  const formFiltroIngenieria = document.getElementById('filtroIngenieriaForm');
+  const filtroProyectoIngenieria = document.getElementById('filtroProyectoIngenieria');
+  const filtroPartidaIngenieria = document.getElementById('filtroPartidaIngenieria');
+
+  function poblarProyectosIngenieriaDesdeTablaSiHaceFalta() {
+    if (!filtroProyectoIngenieria) return;
+    if (filtroProyectoIngenieria.options.length > 1) return;
+
+    const nombres = new Set();
+    document.querySelectorAll('tr.project-divider-row[data-proyecto-nombre]').forEach((row) => {
+      const nombre = (row.dataset.proyectoNombre || '').trim();
+      if (nombre) nombres.add(nombre);
+    });
+
+    [...nombres].sort((a, b) => a.localeCompare(b, 'es')).forEach((nombre) => {
+      const option = document.createElement('option');
+      option.value = `name:${nombre}`;
+      option.textContent = nombre;
+      filtroProyectoIngenieria.appendChild(option);
+    });
+  }
+
+  function aplicarFiltrosIngenieriaEnTabla() {
+    if (!filtroProyectoIngenieria) return;
+
+    const selectedProyecto = String(filtroProyectoIngenieria.value || '0');
+    const partidaFiltro = String((filtroPartidaIngenieria && filtroPartidaIngenieria.value) || '').trim().toUpperCase();
+    const rows = document.querySelectorAll('tr.partida-row');
+    const visiblesPorGrupo = new Map();
+
+    rows.forEach((row) => {
+      const proyectoId = String(row.dataset.proyectoId || '');
+      const proyectoNombre = String(row.dataset.proyectoNombre || '');
+      const partida = String(row.dataset.partida || '').toUpperCase();
+      const groupKey = String(row.dataset.groupKey || '');
+
+      const matchProyecto = (
+        selectedProyecto === '0' ||
+        selectedProyecto === '' ||
+        selectedProyecto === proyectoId ||
+        selectedProyecto === `name:${proyectoNombre}`
+      );
+      const matchPartida = !partidaFiltro || partida.includes(partidaFiltro);
+      const visible = matchProyecto && matchPartida;
+
+      row.style.display = visible ? '' : 'none';
+      if (visible) {
+        visiblesPorGrupo.set(groupKey, (visiblesPorGrupo.get(groupKey) || 0) + 1);
+      }
+    });
+
+    document.querySelectorAll('tr.project-divider-row[data-group-key]').forEach((divider) => {
+      const key = String(divider.dataset.groupKey || '');
+      const visible = (visiblesPorGrupo.get(key) || 0) > 0;
+      divider.style.display = visible ? '' : 'none';
+    });
+  }
+
+  poblarProyectosIngenieriaDesdeTablaSiHaceFalta();
+
+  if (formFiltroIngenieria) {
+    formFiltroIngenieria.addEventListener('submit', (event) => {
+      event.preventDefault();
+      aplicarFiltrosIngenieriaEnTabla();
+    });
+  }
+
+  if (filtroProyectoIngenieria) {
+    filtroProyectoIngenieria.addEventListener('change', aplicarFiltrosIngenieriaEnTabla);
+  }
+
+  if (filtroPartidaIngenieria) {
+    filtroPartidaIngenieria.addEventListener('input', aplicarFiltrosIngenieriaEnTabla);
+  }
+
+  aplicarFiltrosIngenieriaEnTabla();
+
+  function exportarModuloPDF() {
+    window.print();
+  }
+</script>

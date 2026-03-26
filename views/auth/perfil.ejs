@@ -1,0 +1,181 @@
+<div class="row justify-content-center">
+  <div class="col-lg-7 col-xl-6">
+
+    <!-- Encabezado de perfil -->
+    <div class="profile-hero panel-card mb-4">
+      <div class="profile-hero-body">
+        <div class="profile-avatar-lg">
+          <%= (currentUser.nombre || 'U').slice(0,2).toUpperCase() %>
+        </div>
+        <div>
+          <h5 class="mb-0 fw-700"><%= currentUser.nombre %></h5>
+          <span class="badge badge-primary mt-1 text-capitalize">
+            <i class="bi bi-shield-check me-1"></i><%= currentUser.role %>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mensajes de resultado -->
+    <% if (typeof success !== 'undefined' && success) { %>
+      <div class="alert alert-success d-flex align-items-center gap-2 mb-4" role="alert">
+        <i class="bi bi-check-circle-fill"></i>
+        <span><%= success %></span>
+      </div>
+    <% } %>
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="alert alert-danger d-flex align-items-center gap-2 mb-4" role="alert">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <span><%= error %></span>
+      </div>
+    <% } %>
+
+    <!-- Formulario de edición -->
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <h6 class="panel-title"><i class="bi bi-person-gear"></i> Editar Datos Personales</h6>
+      </div>
+      <div class="panel-body">
+        <form action="/perfil" method="POST" novalidate>
+
+          <div class="mb-4">
+            <label class="form-label fw-600" for="nombre">Nombre completo</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-person"></i></span>
+              <input
+                type="text"
+                id="nombre"
+                name="nombre"
+                class="form-control"
+                value="<%= userData.nombre || '' %>"
+                placeholder="Ej. Juan Pérez"
+                required
+                maxlength="100"
+              >
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-600" for="username">Usuario</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-at"></i></span>
+              <input
+                type="text"
+                id="username"
+                name="username"
+                class="form-control"
+                value="<%= userData.username || '' %>"
+                placeholder="Ej. jperez"
+                required
+                maxlength="50"
+              >
+            </div>
+          </div>
+
+          <hr class="my-4">
+          <p class="text-muted small mb-3">
+            <i class="bi bi-lock me-1"></i>
+            Deja los campos de contraseña en blanco si no deseas cambiarla.
+          </p>
+
+          <div class="mb-4">
+            <label class="form-label fw-600" for="password">Nueva contraseña</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-key"></i></span>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                class="form-control"
+                placeholder="Mínimo 6 caracteres"
+                minlength="6"
+                autocomplete="new-password"
+              >
+              <button class="btn btn-outline-secondary" type="button" id="togglePwd" tabindex="-1">
+                <i class="bi bi-eye" id="eyeIcon"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-600" for="password_confirm">Confirmar contraseña</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-key-fill"></i></span>
+              <input
+                type="password"
+                id="password_confirm"
+                name="password_confirm"
+                class="form-control"
+                placeholder="Repite la contraseña"
+                autocomplete="new-password"
+              >
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 pt-2">
+            <a href="/" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left"></i> Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-floppy"></i> Guardar cambios
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+.profile-hero { overflow: visible; }
+.profile-hero-body {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+}
+.profile-avatar-lg {
+  width: 72px;
+  height: 72px;
+  min-width: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  box-shadow: 0 4px 16px rgba(37,99,235,.35);
+}
+.fw-600 { font-weight: 600; }
+.fw-700 { font-weight: 700; }
+.form-label { margin-bottom: 6px; font-size: .85rem; }
+.input-group-text {
+  background: var(--bg);
+  border-color: var(--border);
+  color: var(--muted);
+}
+.form-control {
+  border-color: var(--border);
+  font-size: .875rem;
+}
+.form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+}
+</style>
+
+<script>
+  const togglePwd = document.getElementById('togglePwd');
+  const pwdField  = document.getElementById('password');
+  const eyeIcon   = document.getElementById('eyeIcon');
+  if (togglePwd) {
+    togglePwd.addEventListener('click', () => {
+      const isText = pwdField.type === 'text';
+      pwdField.type = isText ? 'password' : 'text';
+      eyeIcon.className = isText ? 'bi bi-eye' : 'bi bi-eye-slash';
+    });
+  }
+</script>

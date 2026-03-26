@@ -1,0 +1,810 @@
+<%
+  const currentUser = typeof locals.currentUser === 'object' ? locals.currentUser : {};
+  const selectedProyecto = typeof locals.selectedProyecto === 'object' ? locals.selectedProyecto : {};
+  const asignaciones = Array.isArray(locals.asignaciones) ? locals.asignaciones : [];
+  const proveedores = Array.isArray(locals.proveedores) ? locals.proveedores : [];
+  const entradas = Array.isArray(locals.entradas) ? locals.entradas : [];
+  const totalEntradas = Number(locals.totalEntradas || entradas.length || 0);
+
+  const fmtFecha = (date) => {
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const up = (value, fallback = '-') => {
+    const cleaned = String(value || '').trim();
+    return cleaned ? cleaned.toUpperCase() : fallback;
+  };
+%>
+
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Almacen por Proyecto</h1>
+    <p>Gestion detallada de materiales asignados para la obra seleccionada</p>
+  </div>
+  <div class="d-flex align-items-center gap-2 no-print">
+    <a href="/almacen/movimientos" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Volver a movimientos
+    </a>
+    <button type="button" class="btn btn-export-pdf" onclick="exportarProyectoPDF()">
+      <i class="bi bi-file-earmark-pdf"></i> Exportar Proyecto a PDF
+    </button>
+  </div>
+</div>
+
+<section class="module-print-report print-only project-print-report" aria-hidden="true">
+  <div class="module-print-banner">
+    <div class="module-print-brand">
+      <div class="module-print-logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64" role="img" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="14" fill="#0f172a"></rect>
+          <path d="M18 44V20h8l6 8 6-8h8v24h-8V33l-6 8-6-8v11h-8z" fill="#f8fafc"></path>
+          <rect x="12" y="48" width="40" height="5" rx="2.5" fill="#d4a017"></rect>
+        </svg>
+      </div>
+      <div>
+        <p class="module-print-company">Cismining</p>
+        <p class="module-print-system">ERP Construccion</p>
+      </div>
+    </div>
+    <div class="module-print-docmeta">
+      <span>DOC-MOV-PROY</span>
+      <strong>Version 1.0</strong>
+    </div>
+  </div>
+
+  <div class="module-print-head">
+    <div>
+      <p class="module-print-eyebrow">Documento corporativo</p>
+      <h2>Reporte de Entradas por Proyecto</h2>
+      <p>Detalle de ingresos de materiales para el proyecto seleccionado.</p>
+    </div>
+    <div class="module-print-meta-right">
+      <div><strong>Proyecto:</strong> <%= up(selectedProyecto.nombre || '-') %></div>
+      <div><strong>Emitido:</strong> <%= fmtFecha(new Date()) %></div>
+      <div><strong>Preparado por:</strong> <%= up(currentUser?.nombre || 'SISTEMA') %></div>
+    </div>
+  </div>
+
+  <div class="module-print-metrics">
+    <article><span>Entradas</span><strong><%= totalEntradas %></strong></article>
+    <article><span>Proveedores</span><strong><%= proveedores.length %></strong></article>
+    <article><span>Asignaciones</span><strong><%= asignaciones.length %></strong></article>
+  </div>
+
+  <table class="table table-sm module-print-table">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Documento</th>
+        <th>Proveedor</th>
+        <th>Material</th>
+        <th>Cantidad</th>
+        <th>Nuevo Saldo</th>
+        <th>Observacion</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% entradas.forEach((e) => { %>
+        <tr>
+          <td><%= fmtFecha(e.fecha) %></td>
+          <td><%= up(e.referencia_documento || '-') %></td>
+          <td><%= up(e.proveedor_nombre || '-') %></td>
+          <td><%= up(e.material || '-') %> · <%= up(e.unidad || '-') %></td>
+          <td><%= Number(e.cantidad || 0).toFixed(2) %></td>
+          <td><%= Number(e.saldo_resultante || 0).toFixed(2) %></td>
+          <td><%= up(e.observacion || '-') %></td>
+        </tr>
+      <% }) %>
+      <% if (!entradas.length) { %>
+        <tr><td colspan="7" class="text-center">Sin entradas registradas para este proyecto.</td></tr>
+      <% } %>
+    </tbody>
+  </table>
+</section>
+
+<div class="submodule-shell no-print">
+  <nav class="submodule-tabs" aria-label="Submodulos de almacen">
+    <a href="/almacen?mod=base-materiales" class="submodule-tab">
+      <i class="bi bi-database"></i>
+      <span>Base de Datos Materiales</span>
+    </a>
+    <a href="/almacen?mod=almacen" class="submodule-tab">
+      <i class="bi bi-boxes"></i>
+      <span>Almacen por Proyecto</span>
+    </a>
+    <a href="/almacen/movimientos" class="submodule-tab active">
+      <i class="bi bi-arrow-left-right"></i>
+      <span>Movimientos</span>
+    </a>
+  </nav>
+
+  <div class="row g-3 submodule-kpis">
+    <div class="col-md-3 col-sm-6">
+      <div class="kpi-mini">
+        <div class="kpi-mini-left"><i class="bi bi-building"></i><span class="kpi-mini-label">Proyecto</span></div>
+        <span class="kpi-mini-value"><%= up(selectedProyecto.nombre || '-') %></span>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="kpi-mini">
+        <div class="kpi-mini-left"><i class="bi bi-geo-alt"></i><span class="kpi-mini-label">Ubicacion</span></div>
+        <span class="kpi-mini-value" style="font-size: 14px;"><%= up(selectedProyecto.ubicacion || '-') %></span>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="kpi-mini">
+        <div class="kpi-mini-left"><i class="bi bi-box2"></i><span class="kpi-mini-label">Asignaciones</span></div>
+        <span class="kpi-mini-value"><%= asignaciones.length %></span>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="kpi-mini">
+        <div class="kpi-mini-left"><i class="bi bi-clock-history"></i><span class="kpi-mini-label">Entradas</span></div>
+        <span class="kpi-mini-value"><%= entradas.length %></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="bi bi-arrow-down-circle" style="color: #10b981;"></i> Nueva Nota de Entrada
+        </div>
+        <div class="form-section-body">
+          <form action="/almacen/movimientos/<%= selectedProyecto.id %>/entradas" method="post" class="row g-3" id="formEntrada">
+            <div class="col-12">
+              <label class="form-label">Documento de Referencia <span class="badge badge-required">Obligatorio</span></label>
+              <input type="text" name="documento_referencia" class="form-control" placeholder="Nro Guia, Factura, OC (ej: OC-1002, GUIA-456)" required maxlength="80">
+              <small class="field-hint">Numero unico de documento externo para trazabilidad</small>
+            </div>
+
+            <div class="col-12">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
+                <label class="form-label" style="margin-bottom: 0;">Proveedor <span class="badge badge-required">Obligatorio</span></label>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="abrirModalProveedorEntrada()" title="Crear nuevo proveedor" style="padding: 4px 8px; height: auto; margin-left: auto;">
+                  <i class="bi bi-pencil-square" style="font-size: 14px;"></i>
+                </button>
+              </div>
+              <input type="text" id="proveedorSearchEntrada" class="form-control" placeholder="Escribe para buscar proveedor..." autocomplete="off">
+              <div id="proveedorSuggestionsEntrada" style="position: absolute; background: white; border: 1px solid #d1d5db; border-top: none; border-radius: 0 0 8px 8px; max-height: 200px; overflow-y: auto; width: 100%; z-index: 1000; display: none; margin-top: -4px;"></div>
+              <select name="proveedor_id" class="form-select" id="proveedorSelectEntrada" required style="display: none;">
+                <option value="">Selecciona proveedor</option>
+                <% proveedores.forEach((p) => { %>
+                  <option value="<%= p.id %>" data-nombre="<%= up(p.nombre) %>" data-ruc="<%= p.ruc || '' %>"><%= up(p.nombre) %> · <%= p.ruc || 'sin RUC' %></option>
+                <% }) %>
+              </select>
+              <small class="field-hint">De quien se compro el material</small>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Material <span class="badge badge-required">Obligatorio</span></label>
+              <select name="almacen_material_id" class="form-select" id="materialSelectEntrada" required>
+                <option value="">Selecciona material del proyecto</option>
+                <% asignaciones.forEach((a) => { %>
+                  <option
+                    value="<%= a.id %>"
+                    data-material-id="<%= a.material_id %>"
+                    data-material="<%= up(a.material_nombre) %>"
+                    data-unidad="<%= up(a.unidad || '-') %>"
+                    data-saldo="<%= Number(a.cantidad_disponible || 0) %>">
+                    <%= up(a.material_nombre) %> · <%= up(a.unidad || '-') %> · SALDO ACTUAL: <%= Number(a.cantidad_disponible || 0).toFixed(2) %>
+                  </option>
+                <% }) %>
+              </select>
+              <small class="field-hint">Solo muestra materiales asignados a este proyecto</small>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Cantidad de Ingreso <span class="badge badge-required">Obligatorio</span></label>
+              <input type="number" name="cantidad" class="form-control" id="cantidadEntrada" placeholder="0" step="0.01" min="0.01" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Unidad</label>
+              <input type="text" class="form-control" id="unidadEntrada" readonly placeholder="-">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Observacion</label>
+              <textarea name="observacion" class="form-control" placeholder="Detalles adicionales (opcional)" rows="2" maxlength="255"></textarea>
+            </div>
+
+            <div class="col-12 pt-1">
+              <button class="btn btn-ingreso" id="btnRegistrarEntrada" style="width: 100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: white; padding: 10px 20px; border-radius: 8px; font-weight: 600;">
+                <i class="bi bi-check2-circle"></i> Registrar Entrada
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <div class="panel-title"><i class="bi bi-history"></i> Historial de Entradas</div>
+          <span class="badge badge-secondary"><%= entradas.length %> registros</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle table-hover">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Documento</th>
+                <th>Proveedor</th>
+                <th>Material</th>
+                <th>Cantidad</th>
+                <th>Nuevo Saldo</th>
+                <th>Observacion</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% entradas.forEach((e) => { %>
+                <tr>
+                  <td><small class="text-muted"><%= fmtFecha(e.fecha) %></small></td>
+                  <td>
+                    <span class="badge" style="background: #dcfce7; color: #166534; border: 1px solid #a7f3d0; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;"><%= up(e.referencia_documento || '-') %></span>
+                  </td>
+                  <td>
+                    <strong style="color: #059669;"><%= up(e.proveedor_nombre || '-') %></strong>
+                  </td>
+                  <td>
+                    <div class="fw-semibold"><%= up(e.material || '-') %></div>
+                    <small class="text-muted"><%= up(e.unidad || '-') %></small>
+                  </td>
+                  <td class="fw-semibold" style="color: #059669;">
+                    <i class="bi bi-arrow-down"></i> <%= Number(e.cantidad || 0).toFixed(2) %>
+                  </td>
+                  <td class="fw-semibold">
+                    <%= Number(e.saldo_resultante || 0).toFixed(2) %> <%= up(e.unidad || '') %>
+                  </td>
+                  <td><small class="text-muted"><%= up(e.observacion || '-') %></small></td>
+                </tr>
+              <% }) %>
+              <% if (!entradas.length) { %>
+                <tr>
+                  <td colspan="7">
+                    <div class="empty-state">
+                      <i class="bi bi-inbox"></i>
+                      <p>Sin entradas registradas aun</p>
+                    </div>
+                  </td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .page-header-back {
+    display: flex;
+    gap: 8px;
+  }
+
+  .badge-required {
+    background: #fecaca;
+    color: #991b1b;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+
+  .badge-ingreso {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #a7f3d0;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .btn-ingreso {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border: 1px solid #047857;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.2s;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn-ingreso:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
+  }
+
+  .btn-ingreso i {
+    font-size: 18px;
+  }
+
+  .form-section {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .form-section-title {
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #111827;
+  }
+
+  .form-section-title i {
+    font-size: 18px;
+    color: #10b981;
+  }
+
+  .form-section-body {
+    padding: 20px;
+  }
+
+  .form-label {
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .form-control,
+  .form-select {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .form-control:focus,
+  .form-select:focus {
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  }
+
+  .field-hint {
+    display: block;
+    margin-top: 4px;
+    color: #6b7280;
+    font-size: 13px;
+  }
+
+  .panel-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .panel-card-header {
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .panel-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+  }
+
+  .panel-title i {
+    font-size: 18px;
+    color: #10b981;
+  }
+
+  .badge-secondary {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #e5e7eb;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+  }
+
+  .table {
+    margin: 0;
+    font-size: 13px;
+  }
+
+  .table thead {
+    background: #f9fafb;
+    border-bottom: 2px solid #e5e7eb;
+  }
+
+  .table th {
+    font-weight: 600;
+    color: #374151;
+    text-transform: uppercase;
+    font-size: 12px;
+  }
+
+  .table tbody tr:hover {
+    background: #fafafa;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6b7280;
+  }
+
+  .empty-state i {
+    font-size: 48px;
+    margin-bottom: 12px;
+    opacity: 0.3;
+    display: block;
+  }
+
+  .empty-state p {
+    margin: 0;
+    font-size: 14px;
+  }
+
+  .text-success {
+    color: #059669;
+  }
+
+  .text-muted {
+    color: #6b7280;
+  }
+
+  .fw-semibold {
+    font-weight: 600;
+  }
+
+  @media (max-width: 768px) {
+    .row.g-3 > .col-lg-5,
+    .row.g-3 > .col-lg-7 {
+      grid-column: 1 / -1;
+    }
+
+    .table-responsive {
+      margin-left: -15px;
+      margin-right: -15px;
+    }
+
+    .table {
+      font-size: 12px;
+    }
+  }
+</style>
+
+<script>
+  function exportarProyectoPDF() {
+    document.body.classList.add('print-project-almacen');
+    window.print();
+    setTimeout(function() {
+      document.body.classList.remove('print-project-almacen');
+    }, 250);
+  }
+
+  (function initEntradaForm() {
+    const materialSelect = document.getElementById('materialSelectEntrada');
+    const unidadInput = document.getElementById('unidadEntrada');
+
+    if (!materialSelect) return;
+
+    function syncUnidad() {
+      const selectedOption = materialSelect.options[materialSelect.selectedIndex];
+      if (selectedOption && selectedOption.value) {
+        unidadInput.value = selectedOption.getAttribute('data-unidad') || '-';
+      } else {
+        unidadInput.value = '-';
+      }
+    }
+
+    materialSelect.addEventListener('change', syncUnidad);
+    syncUnidad();
+
+    // AUTOCOMPLETE para MATERIAL
+    const materialSearchInput = document.getElementById('materialSelectEntrada');
+    const materialSuggestionsDiv = document.createElement('div');
+    materialSuggestionsDiv.id = 'materialSuggestionsEntradaDiv';
+    materialSuggestionsDiv.style.cssText = 'position: absolute; background: white; border: 1px solid #d1d5db; border-top: none; border-radius: 0 0 8px 8px; max-height: 200px; overflow-y: auto; width: auto; z-index: 1000; display: none;';
+    
+    const originalMaterialOptions = Array.from(materialSelect.options).slice(1).map(opt => ({
+      value: opt.value,
+      text: opt.textContent,
+      element: opt
+    }));
+
+    function filterAndShowMaterialSuggestions(searchTerm) {
+      const filtered = originalMaterialOptions.filter(opt => 
+        opt.text.toUpperCase().includes(searchTerm.toUpperCase())
+      );
+
+      materialSuggestionsDiv.innerHTML = '';
+      if (filtered.length > 0 && searchTerm.length > 0) {
+        filtered.forEach(opt => {
+          const div = document.createElement('div');
+          div.textContent = opt.text;
+          div.style.cssText = 'padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f3f4f6; background: white;';
+          div.onmouseover = () => div.style.background = '#f9fafb';
+          div.onmouseout = () => div.style.background = 'white';
+          div.onclick = () => {
+            materialSelect.value = opt.value;
+            syncUnidad();
+            materialSuggestionsDiv.style.display = 'none';
+          };
+          materialSuggestionsDiv.appendChild(div);
+        });
+        materialSuggestionsDiv.style.display = 'block';
+      } else {
+        materialSuggestionsDiv.style.display = 'none';
+      }
+    }
+
+    // Reemplazar select con input de búsqueda para material
+    const materialInputSearch = document.createElement('input');
+    materialInputSearch.type = 'text';
+    materialInputSearch.id = 'materialSearchInput';
+    materialInputSearch.placeholder = 'Escribe para buscar material...';
+    materialInputSearch.className = 'form-control';
+    materialInputSearch.style.marginBottom = '8px';
+    materialSelect.parentNode.insertBefore(materialInputSearch, materialSelect);
+    
+    materialInputSearch.addEventListener('input', (e) => filterAndShowMaterialSuggestions(e.target.value));
+    materialInputSearch.addEventListener('focus', (e) => filterAndShowMaterialSuggestions(e.target.value));
+    materialInputSearch.parentNode.appendChild(materialSuggestionsDiv);
+
+  })();
+
+  function abrirModalProveedorEntrada() {
+    const modal = new bootstrap.Modal(document.getElementById('modalProveedorEntrada'));
+    modal.show();
+  }
+
+  function mostrarToastProveedorEntrada(mensaje, tipo) {
+    const toastType = tipo === 'error' ? 'danger' : (tipo === 'warning' ? 'warning' : 'success');
+    let container = document.getElementById('toastProveedorEntradaContainer');
+
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toastProveedorEntradaContainer';
+      container.className = 'toast-container position-fixed top-0 end-0 p-3';
+      container.style.zIndex = '2000';
+      document.body.appendChild(container);
+    }
+
+    const toastEl = document.createElement('div');
+    toastEl.className = 'toast align-items-center text-bg-' + toastType + ' border-0';
+    toastEl.setAttribute('role', 'alert');
+    toastEl.setAttribute('aria-live', 'assertive');
+    toastEl.setAttribute('aria-atomic', 'true');
+
+    toastEl.innerHTML = '<div class="d-flex">'
+      + '<div class="toast-body">' + String(mensaje || '') + '</div>'
+      + '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>'
+      + '</div>';
+
+    container.appendChild(toastEl);
+    const toast = new bootstrap.Toast(toastEl, { delay: 3200 });
+    toast.show();
+    toastEl.addEventListener('hidden.bs.toast', function() {
+      toastEl.remove();
+    });
+  }
+
+  function initFormProveedorEntrada() {
+    const formProveedorEntrada = document.getElementById('formProveedorEntrada');
+    if (!formProveedorEntrada) {
+      return;
+    }
+
+    formProveedorEntrada.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+
+      try {
+        const response = await fetch('/almacen/proveedores', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            nombre: formData.get('nombre'),
+            ruc: formData.get('ruc'),
+            contacto: formData.get('contacto'),
+            telefono: formData.get('telefono'),
+            email: formData.get('email'),
+            direccion: formData.get('direccion')
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          // Agregar el proveedor al select oculto para poder seleccionarlo inmediatamente.
+          const select = document.getElementById('proveedorSelectEntrada');
+          const option = document.createElement('option');
+          option.value = data.id;
+          option.setAttribute('data-nombre', data.nombre);
+          option.setAttribute('data-ruc', data.ruc);
+          option.textContent = data.nombre + ' · ' + data.ruc;
+          select.appendChild(option);
+
+          const searchInput = document.getElementById('proveedorSearchEntrada');
+          if (searchInput) {
+            searchInput.value = data.nombre;
+            select.value = data.id;
+          }
+
+          this.reset();
+
+          const modalEl = document.getElementById('modalProveedorEntrada');
+          const modal = bootstrap.Modal.getInstance(modalEl);
+          if (modal) {
+            modal.hide();
+          }
+
+          mostrarToastProveedorEntrada('Proveedor creado exitosamente.', 'success');
+        } else {
+          mostrarToastProveedorEntrada('Error al crear el proveedor: ' + (data.error || 'Error desconocido'), 'error');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        mostrarToastProveedorEntrada('Error al crear el proveedor: ' + error.message, 'error');
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initFormProveedorEntrada);
+  } else {
+    initFormProveedorEntrada();
+  }
+
+  // AUTOCOMPLETE para PROVEEDOR
+  (function initProveedorAutocomplete() {
+    const proveedorSearchInput = document.getElementById('proveedorSearchEntrada');
+    const proveedorSelectHidden = document.getElementById('proveedorSelectEntrada');
+    const proveedorSuggestionsDiv = document.getElementById('proveedorSuggestionsEntrada');
+    
+    if (!proveedorSearchInput || !proveedorSelectHidden) return;
+
+    function getAllProveedores() {
+      return Array.from(proveedorSelectHidden.options)
+        .slice(1)
+        .map(opt => ({
+          id: opt.value,
+          nombre: opt.getAttribute('data-nombre') || opt.textContent.split(' · ')[0],
+          ruc: opt.getAttribute('data-ruc') || opt.textContent.split(' · ')[1] || '',
+          text: opt.textContent
+        }));
+    }
+
+    function filterAndShowProveedorSuggestions(searchTerm) {
+      const allProveedores = getAllProveedores();
+      const filtered = allProveedores.filter(prov => 
+        prov.nombre.toUpperCase().includes(searchTerm.toUpperCase()) ||
+        prov.ruc.toUpperCase().includes(searchTerm.toUpperCase())
+      );
+
+      proveedorSuggestionsDiv.innerHTML = '';
+      if (filtered.length > 0 && searchTerm.length > 0) {
+        filtered.slice(0, 10).forEach(prov => {
+          const div = document.createElement('div');
+          div.textContent = prov.nombre + ' · ' + (prov.ruc || 'sin RUC');
+          div.style.cssText = 'padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f3f4f6; background: white;';
+          div.onmouseover = () => div.style.background = '#f9fafb';
+          div.onmouseout = () => div.style.background = 'white';
+          div.onclick = () => {
+            proveedorSelectHidden.value = prov.id;
+            proveedorSearchInput.value = prov.nombre;
+            proveedorSuggestionsDiv.style.display = 'none';
+          };
+          proveedorSuggestionsDiv.appendChild(div);
+        });
+        proveedorSuggestionsDiv.style.display = 'block';
+      } else {
+        proveedorSuggestionsDiv.style.display = 'none';
+      }
+    }
+
+    proveedorSearchInput.addEventListener('input', (e) => {
+      if (!e.target.value.trim()) {
+        proveedorSelectHidden.value = '';
+      }
+      filterAndShowProveedorSuggestions(e.target.value);
+    });
+    proveedorSearchInput.addEventListener('focus', (e) => filterAndShowProveedorSuggestions(e.target.value));
+    proveedorSearchInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        proveedorSuggestionsDiv.style.display = 'none';
+      }, 150);
+    });
+  })();
+</script>
+
+<div class="modal fade" id="modalProveedorEntrada" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="border-bottom: 2px solid #e5e7eb; background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);">
+        <h5 class="modal-title" style="font-weight: 600; color: #111827;">
+          <i class="bi bi-truck" style="color: #10b981; margin-right: 8px;"></i>Nuevo Proveedor
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <form id="formProveedorEntrada" class="row g-3" style="padding: 20px;">
+        <div class="col-12">
+          <label class="form-label">Nombre del Proveedor <span style="background: #fecaca; color: #991b1b; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600;">*</span></label>
+          <input type="text" name="nombre" class="form-control" placeholder="Nombre empresa" required maxlength="150">
+        </div>
+        
+        <div class="col-12">
+          <label class="form-label">RUC <span style="background: #fecaca; color: #991b1b; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600;">*</span></label>
+          <input type="text" name="ruc" class="form-control" placeholder="RUC" required maxlength="15">
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">Dirección</label>
+          <input type="text" name="direccion" class="form-control" placeholder="Dirección de oficina/almacén" maxlength="255">
+        </div>
+
+        <div class="col-6">
+          <label class="form-label">Contacto</label>
+          <input type="text" name="contacto" class="form-control" placeholder="Nombre contacto" maxlength="150">
+        </div>
+
+        <div class="col-6">
+          <label class="form-label">Teléfono</label>
+          <input type="text" name="telefono" class="form-control" placeholder="+51 999 999 999" maxlength="20">
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control" placeholder="correo@proveedor.com" maxlength="100">
+        </div>
+
+        <div class="col-12 pt-2">
+          <div style="display: flex; gap: 8px;">
+            <button type="submit" class="btn btn-primary" style="flex: 1;">
+              <i class="bi bi-check-lg"></i> Guardar Proveedor
+            </button>
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="flex: 1;">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

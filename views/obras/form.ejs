@@ -1,0 +1,55 @@
+<div class="page-header">
+  <div class="page-header-title">
+    <h1><%= obra?.id ? 'Editar Obra' : 'Nueva Obra' %></h1>
+    <p><%= obra?.id ? 'Actualiza los datos del proyecto' : 'Registra un nuevo proyecto de construcción' %></p>
+  </div>
+  <a href="/obras" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Volver</a>
+</div>
+
+<div class="form-section">
+  <div class="form-section-title"><i class="bi bi-building"></i> Datos del proyecto</div>
+  <div class="form-section-body">
+    <form action="<%= obra?.id ? '/obras/' + obra.id + '?_method=PUT' : '/obras' %>" method="post" class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Nombre del Proyecto</label>
+        <input name="nombre" class="form-control" value="<%= obra?.nombre || '' %>" required placeholder="Ej. Edificio Residencial Los Alamos">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Cliente / Contratante</label>
+        <input name="cliente" class="form-control" value="<%= obra?.cliente || '' %>" required placeholder="Nombre del cliente">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Ubicación</label>
+        <input name="ubicacion" class="form-control" value="<%= obra?.ubicacion || '' %>" required placeholder="Ciudad, dirección">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Fecha de Inicio</label>
+        <input type="date" name="fecha_inicio" class="form-control" value="<%= obra?.fecha_inicio ? obra.fecha_inicio.toISOString().slice(0,10) : '' %>" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Fecha de Fin</label>
+        <input type="date" name="fecha_fin" class="form-control" value="<%= obra?.fecha_fin ? obra.fecha_fin.toISOString().slice(0,10) : '' %>" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Presupuesto (S/)</label>
+        <input type="number" step="0.01" name="presupuesto" class="form-control" value="<%= obra?.presupuesto ?? '' %>" placeholder="0.00">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Estado</label>
+        <select name="estado" class="form-select">
+          <option <%= obra?.estado === 'Planificado'   ? 'selected' : '' %>>Planificado</option>
+          <option <%= obra?.estado === 'En ejecucion'  ? 'selected' : '' %>>En ejecucion</option>
+          <option <%= obra?.estado === 'Cerrado'       ? 'selected' : '' %>>Cerrado</option>
+        </select>
+      </div>
+      <div class="col-12 d-flex gap-2 pt-2">
+        <button class="btn btn-primary">
+          <i class="bi bi-check-lg"></i> <%= obra?.id ? 'Actualizar Obra' : 'Registrar Obra' %>
+        </button>
+        <a href="/obras" class="btn btn-outline-secondary">
+          <i class="bi bi-x-lg"></i> Cancelar
+        </a>
+      </div>
+    </form>
+  </div>
+</div>

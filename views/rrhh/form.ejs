@@ -1,0 +1,257 @@
+<div class="rrhh-user-shell">
+    <div class="page-header rrhh-user-header">
+        <div class="page-header-title">
+            <h1><%= (typeof usuario !== 'undefined' && usuario) ? 'Editar usuario' : 'Nuevo usuario' %></h1>
+            <p><%= (typeof usuario !== 'undefined' && usuario) ? 'Actualiza el acceso al sistema y los datos laborales del empleado.' : 'Crea una cuenta de acceso y registra la información base del empleado.' %></p>
+        </div>
+        <a href="/rrhh" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Volver</a>
+    </div>
+
+    <div class="panel-card rrhh-user-hero mb-4">
+        <div class="panel-body rrhh-user-hero-body">
+            <div class="rrhh-user-avatar">
+                <%= ((typeof usuario !== 'undefined' && usuario ? usuario.username : 'NU') || 'NU').slice(0,2).toUpperCase() %>
+            </div>
+            <div class="rrhh-user-hero-copy">
+                <h2><%= (typeof usuario !== 'undefined' && usuario) ? usuario.username : 'Nuevo acceso del sistema' %></h2>
+                <p><%= (typeof usuario !== 'undefined' && usuario) ? 'Gestiona credenciales, rol y estado de la cuenta.' : 'Define el rol, la contraseña inicial y la asignación del empleado.' %></p>
+            </div>
+            <div class="rrhh-user-hero-meta">
+                <span class="badge badge-secondary"><i class="bi bi-person-badge"></i> <%= (typeof usuario !== 'undefined' && usuario) ? 'Edición' : 'Alta' %></span>
+                <span class="badge <%= (typeof usuario !== 'undefined' && usuario && usuario.role === 'admin') ? 'badge-primary' : 'badge-warning' %>"><i class="bi bi-shield-check"></i> <%= (typeof usuario !== 'undefined' && usuario && usuario.role) ? usuario.role : 'Pendiente' %></span>
+                <% if (typeof usuario !== 'undefined' && usuario) { %>
+                    <span class="badge <%= usuario.activo ? 'badge-success' : 'badge-danger' %>"><i class="bi bi-circle-fill"></i> <%= usuario.activo ? 'Activo' : 'Inactivo' %></span>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <% if (typeof errors !== 'undefined' && errors && errors.length > 0) { %>
+        <div class="alert alert-danger mb-4" role="alert">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <div>
+                <strong>Revisa los datos del formulario.</strong>
+                <ul class="mb-0 mt-2 rrhh-error-list">
+                    <% errors.forEach(error => { %>
+                        <li><%= error.msg %></li>
+                    <% }); %>
+                </ul>
+            </div>
+        </div>
+    <% } %>
+
+    <form method="POST" action="<%= (typeof usuario !== 'undefined' && usuario) ? '/rrhh/usuarios/' + usuario.id + '?_method=PUT' : '/rrhh/usuarios' %>" class="rrhh-user-form">
+        <div class="form-section">
+            <div class="form-section-title"><i class="bi bi-shield-lock"></i> Acceso al sistema</div>
+            <div class="form-section-body">
+                <div class="row g-3">
+                    <div class="col-lg-6">
+                        <label for="username" class="form-label">Usuario</label>
+                        <input type="text"
+                            class="form-control"
+                            id="username"
+                            name="username"
+                            value="<%= (typeof usuario !== 'undefined' && usuario) ? usuario.username : '' %>"
+                            <% if (typeof usuario !== 'undefined' && usuario) { %>disabled<% } %>
+                            placeholder="Ej. juan_diaz"
+                            required>
+                        <div class="field-hint">Usa 3 o más caracteres. Solo letras, números, guiones y guion bajo.</div>
+                    </div>
+
+                    <% if (typeof usuario === 'undefined' || !usuario) { %>
+                        <div class="col-lg-6">
+                            <label for="password" class="form-label">Contraseña inicial</label>
+                            <input type="password"
+                                class="form-control"
+                                id="password"
+                                name="password"
+                                placeholder="Mínimo 6 caracteres"
+                                required>
+                            <div class="field-hint">Se almacenará cifrada y se usará para el primer acceso del usuario.</div>
+                        </div>
+                    <% } else { %>
+                        <div class="col-lg-6">
+                            <label class="form-label">Contraseña</label>
+                            <div class="rrhh-inline-action">
+                                <div>
+                                    <div class="rrhh-inline-action-title">Actualización de credenciales</div>
+                                    <div class="field-hint mb-0">Abre el modal para cambiar la contraseña sin modificar el resto del formulario.</div>
+                                </div>
+                                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalCambiarPassword">
+                                    <i class="bi bi-key"></i> Cambiar contraseña
+                                </button>
+                            </div>
+                        </div>
+                    <% } %>
+
+                    <div class="col-lg-6">
+                        <label for="role" class="form-label">Rol</label>
+                        <select class="form-select" id="role" name="role" required>
+                            <option value="">Selecciona un rol</option>
+                            <option value="admin" <%= (typeof usuario !== 'undefined' && usuario && usuario.role === 'admin') ? 'selected' : '' %>>Administrador</option>
+                            <option value="usuario" <%= (typeof usuario !== 'undefined' && usuario && usuario.role === 'usuario') ? 'selected' : '' %>>Usuario operativo</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="form-section-title"><i class="bi bi-person-vcard"></i> Datos del empleado</div>
+            <div class="form-section-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label for="nombre" class="form-label">Nombre completo</label>
+                        <input type="text"
+                            class="form-control"
+                            id="nombre"
+                            name="nombre"
+                            value="<%= (typeof usuario !== 'undefined' && usuario) ? (usuario.empleado_nombre || usuario.nombre || '') : '' %>"
+                            placeholder="Ej. Juan Pérez Rojas"
+                            required>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="cargo" class="form-label">Cargo</label>
+                        <input type="text"
+                            class="form-control"
+                            id="cargo"
+                            name="cargo"
+                            value="<%= (typeof usuario !== 'undefined' && usuario) ? (usuario.empleado_cargo || usuario.cargo || '') : '' %>"
+                            placeholder="Ej. Residente de obra"
+                            required>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="salario" class="form-label">Salario</label>
+                        <input type="number"
+                            class="form-control"
+                            id="salario"
+                            name="salario"
+                            step="0.01"
+                            min="0"
+                            value="<%= (typeof usuario !== 'undefined' && usuario) ? (usuario.empleado_salario || usuario.salario || 0) : '' %>"
+                            placeholder="0.00"
+                            required>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="proyecto_id" class="form-label">Proyecto asignado</label>
+                        <select class="form-select" id="proyecto_id" name="proyecto_id">
+                            <option value="">Sin proyecto asignado</option>
+                            <% if (typeof proyectos !== 'undefined' && Array.isArray(proyectos)) { %>
+                                <% proyectos.forEach(p => { %>
+                                    <option value="<%= p.id %>" <%= String((typeof usuario !== 'undefined' && usuario) ? (usuario.empleado_proyecto_id || usuario.proyecto_id || '') : '') === String(p.id) ? 'selected' : '' %>><%= p.nombre %></option>
+                                <% }) %>
+                            <% } %>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="estado" class="form-label">Estado del empleado</label>
+                        <select class="form-select" id="estado" name="estado" required>
+                            <option value="Activo" <%= (typeof usuario !== 'undefined' && usuario && (usuario.empleado_estado || usuario.estado) === 'Activo') ? 'selected' : '' %>>Activo</option>
+                            <option value="Inactivo" <%= (typeof usuario !== 'undefined' && usuario && (usuario.empleado_estado || usuario.estado) === 'Inactivo') ? 'selected' : '' %>>Inactivo</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <% if (typeof usuario !== 'undefined' && usuario) { %>
+            <div class="form-section">
+                <div class="form-section-title"><i class="bi bi-toggles"></i> Estado de la cuenta</div>
+                <div class="form-section-body">
+                    <label class="rrhh-switch-card" for="activo">
+                        <div>
+                            <div class="rrhh-switch-title">Usuario activo</div>
+                            <div class="field-hint mb-0">Si lo desactivas, la cuenta no podrá iniciar sesión en el sistema.</div>
+                        </div>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" id="activo" name="activo" value="1" <%= usuario.activo ? 'checked' : '' %>>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        <% } %>
+
+        <div class="rrhh-form-actions">
+            <a href="/rrhh" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i> Cancelar</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-floppy"></i>
+                <%= (typeof usuario !== 'undefined' && usuario) ? 'Guardar cambios' : 'Crear usuario' %>
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Modal para cambiar contraseña -->
+<% if (typeof usuario !== 'undefined' && usuario) { %>
+    <div class="modal fade" id="modalCambiarPassword" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-key me-2"></i>Cambiar contraseña</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formCambiarPassword">
+                        <div class="mb-3">
+                            <label for="newPassword" class="form-label">Nueva Contraseña</label>
+                            <input type="password" class="form-control" id="newPassword" required 
+                                minlength="6" placeholder="Mínimo 6 caracteres">
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label">Confirmar Contraseña</label>
+                            <input type="password" class="form-control" id="confirmPassword" required 
+                                minlength="6" placeholder="Repite la contraseña">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnGuardarPassword">Guardar nueva contraseña</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.getElementById('btnGuardarPassword').addEventListener('click', async function() {
+        const newPass = document.getElementById('newPassword').value;
+        const confirmPass = document.getElementById('confirmPassword').value;
+
+        if (newPass !== confirmPass) {
+            alert('⚠️ Las contraseñas no coinciden');
+            return;
+        }
+
+        if (newPass.length < 6) {
+            alert('⚠️ La contraseña debe tener al menos 6 caracteres');
+            return;
+        }
+
+        try {
+            const response = await fetch('/rrhh/usuarios/<%= usuario.id %>/cambiar-contraseña', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ password: newPass })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                alert('✓ ' + result.message);
+                bootstrap.Modal.getInstance(document.getElementById('modalCambiarPassword')).hide();
+                document.getElementById('formCambiarPassword').reset();
+            } else {
+                alert('❌ Error: ' + result.message);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error al cambiar la contraseña');
+        }
+    });
+    </script>
+<% } %>

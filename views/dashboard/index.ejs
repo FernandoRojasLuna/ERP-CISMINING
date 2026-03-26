@@ -1,0 +1,191 @@
+<%
+function fmtDate(d) {
+  if (!d) return '';
+  const s = (d instanceof Date) ? d.toISOString().slice(0,10) : String(d).slice(0,10);
+  const p = s.split('-');
+  if (p.length !== 3) return s;
+  const M = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  return parseInt(p[2]) + ' ' + (M[parseInt(p[1])-1] || '');
+}
+%>
+<!-- ── Fila 1: KPI principales ───────────────────────────────── -->
+<div class="row g-3 mb-3">
+  <div class="col-sm-6 col-xl-3">
+    <div class="kpi-card">
+      <div class="kpi-icon"><i class="bi bi-building"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Obras activas</div>
+        <div class="kpi-value"><%= kpi.obras_activas || 0 %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="kpi-card warning">
+      <div class="kpi-icon"><i class="bi bi-list-check"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Tareas abiertas</div>
+        <div class="kpi-value"><%= kpi.tareas_abiertas || 0 %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="kpi-card success">
+      <div class="kpi-icon"><i class="bi bi-graph-up-arrow"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Avance promedio</div>
+        <div class="kpi-value"><%= kpi.avance_promedio || 0 %>%</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="kpi-card danger">
+      <div class="kpi-icon"><i class="bi bi-exclamation-triangle"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Mat. críticos</div>
+        <div class="kpi-value"><%= kpi.materiales_criticos || 0 %></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Fila 2: KPI secundarios ───────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="kpi-mini">
+      <div class="kpi-mini-left">
+        <i class="bi bi-check2-all" style="color:var(--success)"></i>
+        <span class="kpi-mini-label">Tareas completadas</span>
+      </div>
+      <span class="kpi-mini-value"><%= kpi.tareas_completadas || 0 %></span>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="kpi-mini">
+      <div class="kpi-mini-left">
+        <i class="bi bi-people" style="color:var(--primary)"></i>
+        <span class="kpi-mini-label">Personal activo</span>
+      </div>
+      <span class="kpi-mini-value"><%= kpi.personal_activo || 0 %></span>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="kpi-mini">
+      <div class="kpi-mini-left">
+        <i class="bi bi-arrow-up-circle" style="color:var(--success)"></i>
+        <span class="kpi-mini-label">Ingresos</span>
+      </div>
+      <span class="kpi-mini-value">S/ <%= kpi.ingresos ? Number(kpi.ingresos).toLocaleString('es-PE', {minimumFractionDigits:0, maximumFractionDigits:0}) : '0' %></span>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="kpi-mini">
+      <div class="kpi-mini-left">
+        <i class="bi bi-arrow-down-circle" style="color:var(--danger)"></i>
+        <span class="kpi-mini-label">Egresos</span>
+      </div>
+      <span class="kpi-mini-value" style="color:var(--danger)">S/ <%= kpi.egresos ? Number(kpi.egresos).toLocaleString('es-PE', {minimumFractionDigits:0, maximumFractionDigits:0}) : '0' %></span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Fila 3: Gráficos ──────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-lg-8">
+    <div class="panel-card h-100">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-activity"></i> Actividades cumplidas por día</div>
+      </div>
+      <div class="panel-body" style="padding-bottom:18px">
+        <canvas id="cumplidasChart" style="height:210px"
+          data-labels='<%- JSON.stringify(cumplidasPorDia.map(x => fmtDate(x.fecha))) %>'
+          data-values='<%- JSON.stringify(cumplidasPorDia.map(x => x.total)) %>'></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="panel-card h-100">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-pie-chart"></i> Estado de actividades</div>
+      </div>
+      <div class="panel-body" style="padding-bottom:18px">
+        <canvas id="estadoChart" style="height:210px"
+          data-labels='<%- JSON.stringify(estadoTareas.map(x => x.estado)) %>'
+          data-values='<%- JSON.stringify(estadoTareas.map(x => x.total)) %>'></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Fila 4: Tabla + Stock crítico ─────────────────────────── -->
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-clock-history"></i> Últimas actividades</div>
+        <a href="/actividades" class="btn btn-xs btn-outline-secondary">Ver todas</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle table-hover">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Actividad</th>
+              <th>Proyecto</th>
+              <th>Estado</th>
+              <th>Avance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% ultimasActividades.forEach(item => { %>
+              <tr>
+                <td><span class="badge badge-secondary" style="font-family:monospace;font-size:.72rem"><%= item.codigo %></span></td>
+                <td class="fw-semibold" style="max-width:180px"><%= item.nombre %></td>
+                <td class="text-muted" style="font-size:.8rem"><%= item.proyecto || '—' %></td>
+                <td>
+                  <span class="rounded-badge estado-<%= (item.estado||'').toLowerCase().replace(/\s+/g,'-') %>">
+                    <%= item.estado %>
+                  </span>
+                </td>
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="progress flex-grow-1" style="min-width:60px">
+                      <div class="progress-bar" style="width:<%= item.avance_porcentaje %>%"></div>
+                    </div>
+                    <small style="color:var(--muted);white-space:nowrap"><%= item.avance_porcentaje %>%</small>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+            <% if (!ultimasActividades.length) { %>
+              <tr><td colspan="5" class="text-center text-muted" style="padding:28px">Sin actividades registradas</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <div class="panel-title"><i class="bi bi-exclamation-triangle"></i> Stock crítico</div>
+        <a href="/almacen" class="btn btn-xs btn-outline-secondary">Ver almacén</a>
+      </div>
+      <div class="panel-body" style="padding-top:8px">
+        <% if (stockCritico.length) { %>
+          <% stockCritico.forEach(item => { %>
+            <div class="alert-row">
+              <div>
+                <div class="fw-semibold" style="font-size:.855rem"><%= item.nombre %></div>
+                <div class="text-muted" style="font-size:.77rem"><%= item.codigo %> &middot; Mín <%= item.stock_minimo %> <%= item.unidad %></div>
+              </div>
+              <span class="badge badge-danger"><%= item.stock_actual %> <%= item.unidad %></span>
+            </div>
+          <% }) %>
+        <% } else { %>
+          <div class="empty-state"><i class="bi bi-check-circle"></i><p>Sin alertas de stock</p></div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+

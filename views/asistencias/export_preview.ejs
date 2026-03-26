@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title || 'Vista Previa Asistencias' %></title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #dbe3ee;
+      --surface: #ffffff;
+      --soft: #f8fafc;
+      --accent: #1e3a8a;
+      --ok: #047857;
+      --gold: #d4a017;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(180deg, #eef2f8 0%, #f8fafc 100%);
+      color: var(--ink);
+      padding: 18px;
+    }
+
+    .toolbar {
+      max-width: 1240px;
+      margin: 0 auto 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #ffffff;
+    }
+
+    .toolbar .left {
+      font-weight: 700;
+      color: #1d4ed8;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      font-size: 12px;
+    }
+
+    .toolbar .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 9px;
+      padding: 9px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary { background: #1d4ed8; color: #fff; }
+    .btn-dark { background: #0f172a; color: #fff; }
+    .btn-soft { background: #e2e8f0; color: #0f172a; }
+
+    .sheet {
+      max-width: 1240px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 10px 24px rgba(2, 6, 23, 0.08);
+    }
+
+    .sheet-head {
+      background: #0f172a;
+      color: #fff;
+      padding: 16px 18px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .logo {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      background: #ffffff;
+      color: #0f172a;
+      font-weight: 900;
+    }
+
+    .meta {
+      padding: 12px 18px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+      gap: 8px;
+      font-size: 13px;
+      color: #334155;
+    }
+
+    .meta strong { color: #0f172a; }
+
+    .table-wrap { padding: 12px 14px 16px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    thead th {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      padding: 9px 6px;
+      border: 1px solid #26469b;
+      text-align: center;
+    }
+
+    tbody td {
+      border: 1px solid var(--line);
+      padding: 8px 6px;
+      text-align: center;
+      background: #fff;
+    }
+
+    tbody tr:nth-child(odd) td {
+      background: var(--soft);
+    }
+
+    td.left { text-align: left; }
+    td.money { text-align: right; font-variant-numeric: tabular-nums; }
+
+    tfoot td {
+      border: 1px solid var(--line);
+      background: #e2e8f0;
+      font-weight: 800;
+      padding: 9px 6px;
+    }
+
+    tfoot td.total {
+      color: var(--ok);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .foot-note {
+      padding: 10px 14px 14px;
+      font-size: 11px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+    }
+
+    @media print {
+      body { background: #fff; padding: 0; }
+      .toolbar { display: none !important; }
+      .sheet { border: 0; box-shadow: none; border-radius: 0; max-width: none; }
+      @page { size: A4 landscape; margin: 10mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <div class="left">Vista Previa Oficial - Asistencias</div>
+    <div class="actions">
+      <button class="btn btn-dark" onclick="window.print()">
+        <i class="bi bi-printer"></i> Imprimir / Guardar PDF
+      </button>
+      <% if (exportType === 'excel') { %>
+        <a class="btn btn-primary" href="<%= downloadExcelUrl %>">
+          <i class="bi bi-file-earmark-excel"></i> Descargar Excel
+        </a>
+      <% } %>
+      <a class="btn btn-soft" href="/asistencias">
+        <i class="bi bi-arrow-left"></i> Volver
+      </a>
+    </div>
+  </div>
+
+  <section class="sheet">
+    <header class="sheet-head">
+      <div class="brand">
+        <div class="logo">C</div>
+        <div>
+          <div style="font-size:15px;font-weight:800;">Reporte Oficial de Asistencias</div>
+          <div style="font-size:12px;opacity:.9;">ERP Construccion - Documento corporativo</div>
+        </div>
+      </div>
+      <div style="font-size:12px;text-align:right;">
+        <div>DOC-ASIST</div>
+        <div>Version 1.0</div>
+      </div>
+    </header>
+
+    <div class="meta">
+      <div><strong>Proyecto:</strong> <%= proyectoNombre %></div>
+      <div><strong>Periodo:</strong> <%= periodoLabel %></div>
+      <div><strong>Emitido:</strong> <%= emitido %></div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:38px;">N°</th>
+            <th style="text-align:left;">Trabajador (Doc / Nombre)</th>
+            <th style="width:58px;">Dias</th>
+            <th style="width:80px;">S/ Dia</th>
+            <th style="width:90px;">Imp.</th>
+            <th style="width:80px;">Adel.</th>
+            <th style="width:80px;">Desc.</th>
+            <th style="width:92px;">Neto</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!rows || !rows.length) { %>
+            <tr>
+              <td colspan="8" style="padding:20px 8px;color:#64748b;">Sin trabajadores para los filtros seleccionados.</td>
+            </tr>
+          <% } %>
+          <% (rows || []).forEach((row) => { %>
+            <tr>
+              <td><%= row.n %></td>
+              <td class="left"><%= row.docNombre %></td>
+              <td><%= Number(row.dias || 0).toFixed(1) %></td>
+              <td class="money"><%= Number(row.salarioDia || 0).toFixed(2) %></td>
+              <td class="money"><%= Number(row.importe || 0).toFixed(2) %></td>
+              <td class="money"><%= Number(row.adelanto || 0).toFixed(2) %></td>
+              <td class="money"><%= Number(row.descuentos || 0).toFixed(2) %></td>
+              <td class="money" style="font-weight:800;color:#047857;"><%= Number(row.neto || 0).toFixed(2) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="7" style="text-align:right;">TOTAL NETO PROYECTADO</td>
+            <td class="total"><%= Number(totalNeto || 0).toFixed(2) %></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="foot-note">
+      Documento para uso interno. Esta vista previa se genera con los filtros activos del módulo Asistencias.
+    </div>
+  </section>
+</body>
+</html>

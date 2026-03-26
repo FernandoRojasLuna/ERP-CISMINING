@@ -1,0 +1,33 @@
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="panel-card form-card">
+      <div class="panel-title">Calculo tecnico de materiales</div>
+      <form action="/ingenieria/calculadora" method="post" class="row g-3">
+        <div class="col-12"><label class="form-label">Proyecto</label><select name="proyecto_id" class="form-select"><option value="">Sin guardar</option><% proyectos.forEach(p => { %><option value="<%= p.id %>" <%= String(form.proyecto_id||'')===String(p.id)?'selected':'' %>><%= p.nombre %></option><% }) %></select></div>
+        <div class="col-12"><label class="form-label">Tipo de calculo</label><select name="tipo_calculo" class="form-select"><option value="concreto">Concreto</option><option value="muro">Muro</option><option value="tarrajeo">Tarrajeo</option></select></div>
+        <div class="col-md-4"><label class="form-label">Largo</label><input step="0.01" type="number" name="largo" class="form-control" value="<%= form.largo || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">Ancho</label><input step="0.01" type="number" name="ancho" class="form-control" value="<%= form.ancho || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">Alto</label><input step="0.01" type="number" name="alto" class="form-control" value="<%= form.alto || '' %>"></div>
+        <div class="col-md-6"><label class="form-label">Area m2</label><input step="0.01" type="number" name="area" class="form-control" value="<%= form.area || '' %>"></div>
+        <div class="col-md-6"><label class="form-label">Espesor cm</label><input step="0.01" type="number" name="espesor" class="form-control" value="<%= form.espesor || '1.5' %>"></div>
+        <div class="col-12"><label class="form-label">Resistencia f'c</label><select name="resistencia" class="form-select"><option value="175">175</option><option value="210" selected>210</option><option value="280">280</option></select></div>
+        <div class="col-12"><label class="form-label">Detalle</label><textarea name="detalle" class="form-control"></textarea></div>
+        <div class="col-12"><button class="btn btn-primary">Calcular</button></div>
+      </form>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="panel-card">
+      <div class="panel-title">Resultado</div>
+      <% if (resultado) { %>
+        <div class="report-sheet">
+          <% Object.entries(resultado).forEach(([k,v]) => { %>
+            <div class="report-row"><span><%= k %></span><strong><%= v %></strong></div>
+          <% }) %>
+        </div>
+      <% } else { %>
+        <p class="text-secondary">Realiza un calculo para ver cantidades aproximadas de materiales.</p>
+      <% } %>
+    </div>
+  </div>
+</div>

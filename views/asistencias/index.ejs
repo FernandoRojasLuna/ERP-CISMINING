@@ -1,0 +1,668 @@
+<%
+  const asistencia = typeof locals.asistencia === 'object' && locals.asistencia ? locals.asistencia : {
+    filtros: {},
+    monthDays: [],
+    empleados: [],
+    resumen: { trabajadores: 0, montoProyectado: 0 },
+    periodoInicio: null,
+    periodoFin: null
+  };
+  const asistenciaFiltros = asistencia.filtros || {};
+  const asistenciaDias = Array.isArray(asistencia.monthDays) ? asistencia.monthDays : [];
+  const asistenciaDiasCompat = asistenciaDias.map((d) => {
+    const fecha = d.fecha || '';
+    const diaMes = Number.isFinite(Number(d.diaMes)) ? Number(d.diaMes) : Number(String(fecha).slice(8, 10) || 0);
+    const diaSemana = d.diaSemana || d.label || '-';
+    return {
+      ...d,
+      fecha,
+      diaMes,
+      diaSemana
+    };
+  });
+  const asistenciaEmpleados = Array.isArray(asistencia.empleados) ? asistencia.empleados : [];
+  const asistenciaResumen = typeof asistencia.resumen === 'object' && asistencia.resumen
+    ? asistencia.resumen
+    : { trabajadores: 0, montoProyectado: 0 };
+  const mesesAsistencia = [
+    { v: 1, t: 'Enero' },
+    { v: 2, t: 'Febrero' },
+    { v: 3, t: 'Marzo' },
+    { v: 4, t: 'Abril' },
+    { v: 5, t: 'Mayo' },
+    { v: 6, t: 'Junio' },
+    { v: 7, t: 'Julio' },
+    { v: 8, t: 'Agosto' },
+    { v: 9, t: 'Septiembre' },
+    { v: 10, t: 'Octubre' },
+    { v: 11, t: 'Noviembre' },
+    { v: 12, t: 'Diciembre' }
+  ];
+  const anioBase = new Date().getFullYear();
+  const periodoInicio = asistencia.periodoInicio || asistencia.semanaInicio || null;
+  const periodoFin = asistencia.periodoFin || asistencia.semanaFin || null;
+  const proyectoSeleccionado = Array.isArray(proyectos)
+    ? proyectos.find((p) => Number(p.id) === Number(asistenciaFiltros.proyectoId || 0))
+    : null;
+  const proyectoNombre = proyectoSeleccionado ? proyectoSeleccionado.nombre : 'Todos los proyectos';
+  const periodoLabel = `${mesesAsistencia.find((m) => Number(m.v) === Number(asistenciaFiltros.month || 0))?.t || ''} ${asistenciaFiltros.year || ''}`.trim();
+  const fechaEmision = new Date().toLocaleDateString('es-PE');
+  const totalCols = asistenciaDiasCompat.length + 8;
+%>
+
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Asistencias</h1>
+    <p>Tareo mensual completo con cálculo automático de séptimo día</p>
+  </div>
+  <div class="d-flex align-items-center gap-2 no-print">
+    <button type="button" class="btn btn-export-pdf" onclick="abrirVistaPreviaAsistencia('PDF')">
+      <i class="bi bi-filetype-pdf"></i> Vista Previa PDF
+    </button>
+    <button type="button" class="btn btn-primary" onclick="abrirVistaPreviaAsistencia('EXCEL')">
+      <i class="bi bi-file-earmark-excel"></i> Vista Previa Excel
+    </button>
+  </div>
+</div>
+
+<section class="module-print-report print-only" aria-hidden="true" id="asistenciaPrintReport">
+  <div class="module-print-banner">
+    <div class="module-print-brand">
+      <div class="module-print-logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64" role="img" focusable="false">
+          <rect x="2" y="2" width="60" height="60" rx="14" fill="#0f172a"></rect>
+          <path d="M18 44V20h8l6 8 6-8h8v24h-8V33l-6 8-6-8v11h-8z" fill="#f8fafc"></path>
+          <rect x="12" y="48" width="40" height="5" rx="2.5" fill="#d4a017"></rect>
+        </svg>
+      </div>
+      <div>
+        <p class="module-print-company">Cismining</p>
+        <p class="module-print-system">ERP Construccion</p>
+      </div>
+    </div>
+    <div class="module-print-docmeta">
+      <span id="asistenciaPrintDocType">DOC-ASIST-PDF</span>
+      <strong>Version 1.0</strong>
+    </div>
+  </div>
+
+  <div class="module-print-head">
+    <div>
+      <p class="module-print-eyebrow">Documento corporativo</p>
+      <h2>Reporte Oficial de Asistencias</h2>
+      <p>Resumen mensual oficial sin calendario diario.</p>
+    </div>
+    <div class="module-print-meta-right">
+      <div><strong>Proyecto:</strong> <%= proyectoNombre %></div>
+      <div><strong>Periodo:</strong> <%= periodoLabel || '-' %></div>
+      <div><strong>Emitido:</strong> <%= fechaEmision %></div>
+    </div>
+  </div>
+
+  <div class="module-print-metrics">
+    <article><span>Trabajadores activos</span><strong><%= Number(asistenciaResumen.trabajadores || 0) %></strong></article>
+    <article><span>Periodo seleccionado</span><strong><%= periodoInicio && periodoFin ? `${periodoInicio} a ${periodoFin}` : '-' %></strong></article>
+    <article><span>Monto proyectado</span><strong>S/ <%= Number(asistenciaResumen.montoProyectado || 0).toFixed(2) %></strong></article>
+  </div>
+
+  <table class="table table-sm module-print-table">
+    <colgroup>
+      <col style="width: 4%;">
+      <col style="width: 24%;">
+      <col style="width: 16%;">
+      <col style="width: 8%;">
+      <col style="width: 11%;">
+      <col style="width: 11%;">
+      <col style="width: 8%;">
+      <col style="width: 8%;">
+      <col style="width: 10%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th style="width:40px;">N°</th>
+        <th style="text-align:left;">Trabajador</th>
+        <th style="text-align:left;">Cargo</th>
+        <th>Dias</th>
+        <th>Salario/Dia</th>
+        <th>Imp.</th>
+        <th>Adel.</th>
+        <th>Desc.</th>
+        <th>Neto</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!asistenciaEmpleados.length) { %>
+        <tr><td colspan="9" class="text-center">Sin trabajadores para los filtros seleccionados.</td></tr>
+      <% } %>
+      <% asistenciaEmpleados.forEach((emp, idx) => { %>
+        <tr>
+          <td><%= idx + 1 %></td>
+          <td style="text-align:left;"><%= emp.nombre %></td>
+          <td style="text-align:left;"><%= emp.cargo || '-' %></td>
+          <td><%= Number(emp.diasTrabajados || 0).toFixed(1) %></td>
+          <td style="text-align:right;"><%= Number(emp.salarioDia || 0).toFixed(2) %></td>
+          <td style="text-align:right;"><%= Number(emp.importe || 0).toFixed(2) %></td>
+          <td style="text-align:right;"><%= Number(emp.adelanto || 0).toFixed(2) %></td>
+          <td style="text-align:right;"><%= Number(emp.descuentos || 0).toFixed(2) %></td>
+          <td style="text-align:right;font-weight:700;color:#047857;"><%= Number(emp.neto || 0).toFixed(2) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="8" style="text-align:right; font-weight:700;">TOTAL NETO PROYECTADO</td>
+        <td style="text-align:right; font-weight:800; color:#047857;"><%= Number(asistenciaResumen.montoProyectado || 0).toFixed(2) %></td>
+      </tr>
+    </tfoot>
+  </table>
+</section>
+
+<div class="panel-card" id="asistencias-modulo">
+  <div class="panel-card-header">
+    <div class="panel-title"><i class="bi bi-calendar2-check"></i> Control de Asistencia Mensual</div>
+    <span class="badge badge-secondary">Módulo independiente</span>
+  </div>
+
+  <div class="form-section-body pt-3 pb-2">
+    <form method="get" action="/asistencias" class="row g-2 align-items-end" id="filtrosAsistenciaForm">
+      <div class="col-md-4">
+        <label class="form-label">Proyecto</label>
+        <select class="form-select filtro-auto" name="asistencia_proyecto_id">
+          <option value="">Todos los proyectos</option>
+          <% if (Array.isArray(proyectos)) { %>
+            <% proyectos.forEach((p) => { %>
+              <option value="<%= p.id %>" <%= Number(asistenciaFiltros.proyectoId || 0) === Number(p.id) ? 'selected' : '' %>>
+                <%= p.nombre %>
+              </option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Mes</label>
+        <select class="form-select filtro-auto" name="asistencia_mes" required>
+          <% mesesAsistencia.forEach((m) => { %>
+            <option value="<%= m.v %>" <%= Number(asistenciaFiltros.month || 0) === Number(m.v) ? 'selected' : '' %>><%= m.t %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Año</label>
+        <select class="form-select filtro-auto" name="asistencia_anio" required>
+          <% for (let i = anioBase - 1; i <= anioBase + 2; i += 1) { %>
+            <option value="<%= i %>" <%= Number(asistenciaFiltros.year || 0) === Number(i) ? 'selected' : '' %>><%= i %></option>
+          <% } %>
+        </select>
+      </div>
+    </form>
+  </div>
+
+  <div class="asistencia-summary-grid">
+    <article>
+      <span>Trabajadores activos</span>
+      <strong><%= Number(asistenciaResumen.trabajadores || 0) %></strong>
+    </article>
+    <article>
+      <span>Periodo seleccionado</span>
+      <strong><%= periodoInicio && periodoFin ? `${periodoInicio} a ${periodoFin}` : '-' %></strong>
+    </article>
+    <article>
+      <span>Monto proyectado</span>
+      <strong id="asistenciaResumenMonto">S/ <%= Number(asistenciaResumen.montoProyectado || 0).toFixed(2) %></strong>
+    </article>
+  </div>
+
+  <div class="table-responsive">
+    <table
+      class="table table-hover align-middle asistencia-table"
+      id="tablaAsistenciaMensual"
+      data-periodo-inicio="<%= periodoInicio || '' %>">
+      <thead>
+        <tr>
+          <th class="col-fija">Doc./Nombre</th>
+          <% asistenciaDiasCompat.forEach((d) => { %>
+            <th class="text-center"><%= d.diaSemana %><small><%= String(d.diaMes).padStart(2, '0') %></small></th>
+          <% }) %>
+          <th>Dias</th>
+          <th>S/ Dia</th>
+          <th>Imp.</th>
+          <th class="col-ajuste">Adel.</th>
+          <th class="col-ajuste">Desc.</th>
+          <th>Neto</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!asistenciaEmpleados.length) { %>
+          <tr>
+            <td colspan="<%= totalCols %>">
+              <div class="empty-state"><i class="bi bi-calendar-x"></i><p>Sin trabajadores activos para los filtros seleccionados.</p></div>
+            </td>
+          </tr>
+        <% } %>
+        <% asistenciaEmpleados.forEach((emp) => { %>
+          <tr data-row-empleado="<%= emp.id %>">
+            <td class="col-fija">
+              <div class="fw-semibold"><%= emp.nombre %></div>
+              <small class="text-muted"><%= emp.docIdentidad %> · <%= emp.cargo || '-' %></small>
+            </td>
+            <% emp.dias.forEach((dia) => { %>
+              <td class="text-center">
+                <button
+                  type="button"
+                  class="asistencia-cell <%= dia.asistio ? 'is-on' : 'is-off' %> <%= dia.esDomingo ? 'is-sunday' : '' %>"
+                  data-empleado-id="<%= emp.id %>"
+                  data-fecha="<%= dia.fecha %>"
+                  data-value="<%= dia.asistio ? 1 : 0 %>"
+                  data-domingo="<%= dia.esDomingo ? 1 : 0 %>">
+                  <%= dia.asistio ? '1' : '' %>
+                </button>
+              </td>
+            <% }) %>
+            <td class="fw-semibold" data-field="dias-trabajados"><%= Number(emp.diasTrabajados || 0).toFixed(1) %></td>
+            <td class="fw-semibold">S/ <%= Number(emp.salarioDia || 0).toFixed(2) %></td>
+            <td class="fw-semibold" data-field="importe">S/ <%= Number(emp.importe || 0).toFixed(2) %></td>
+            <td class="col-ajuste">
+              <span class="badge bg-warning text-dark">
+                <%= Number(emp.adelanto || 0).toFixed(2) %>
+              </span>
+            </td>
+            <td class="col-ajuste">
+              <span class="badge bg-danger">
+                <%= Number(emp.descuentos || 0).toFixed(2) %>
+              </span>
+            </td>
+            <td class="fw-bold text-success" data-field="neto">S/ <%= Number(emp.neto || 0).toFixed(2) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  function abrirVistaPreviaAsistencia(tipo) {
+    const originalTitle = document.title;
+    const label = document.getElementById('asistenciaPrintDocType');
+    if (label) {
+      label.textContent = tipo === 'EXCEL' ? 'DOC-ASIST-EXCEL' : 'DOC-ASIST-PDF';
+    }
+    document.title = `Reporte Oficial de Asistencias - ${tipo}`;
+    window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 300);
+  }
+
+  (function initAsistenciaModulo() {
+    const tabla = document.getElementById('tablaAsistenciaMensual');
+    const filtrosForm = document.getElementById('filtrosAsistenciaForm');
+    if (!tabla) return;
+
+    if (filtrosForm) {
+      filtrosForm.querySelectorAll('select.filtro-auto').forEach((sel) => {
+        sel.addEventListener('change', function() {
+          filtrosForm.submit();
+        });
+      });
+    }
+
+    const periodoInicio = tabla.getAttribute('data-periodo-inicio') || '';
+    if (!periodoInicio) return;
+
+    function toMoney(value) {
+      return 'S/ ' + Number(value || 0).toFixed(2);
+    }
+
+    function mostrarToastAsistencia(mensaje, tipo) {
+      const toastType = tipo === 'error' ? 'danger' : 'success';
+      let container = document.getElementById('toastAsistenciaContainer');
+
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastAsistenciaContainer';
+        container.className = 'toast-container position-fixed top-0 end-0 p-3';
+        container.style.zIndex = '2200';
+        document.body.appendChild(container);
+      }
+
+      const toastEl = document.createElement('div');
+      toastEl.className = 'toast align-items-center text-bg-' + toastType + ' border-0';
+      toastEl.setAttribute('role', 'alert');
+      toastEl.setAttribute('aria-live', 'assertive');
+      toastEl.setAttribute('aria-atomic', 'true');
+      toastEl.innerHTML = '<div class="d-flex">'
+        + '<div class="toast-body">' + String(mensaje || '') + '</div>'
+        + '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>'
+        + '</div>';
+      container.appendChild(toastEl);
+      const toast = new bootstrap.Toast(toastEl, { delay: 2600 });
+      toast.show();
+      toastEl.addEventListener('hidden.bs.toast', function() { toastEl.remove(); });
+    }
+
+    function recalcularResumenMonto() {
+      let total = 0;
+      tabla.querySelectorAll('td[data-field="neto"]').forEach((cell) => {
+        const raw = String(cell.textContent || '').replace('S/', '').trim();
+        total += Number(raw || 0);
+      });
+      const resumen = document.getElementById('asistenciaResumenMonto');
+      if (resumen) resumen.textContent = toMoney(total);
+    }
+
+    function applyCellState(cell, value) {
+      cell.setAttribute('data-value', value ? '1' : '0');
+      cell.textContent = value ? '1' : '';
+      cell.classList.toggle('is-on', !!value);
+      cell.classList.toggle('is-off', !value);
+    }
+
+    async function toggleAsistencia(cell) {
+      const empleadoId = Number(cell.getAttribute('data-empleado-id') || 0);
+      const fecha = cell.getAttribute('data-fecha') || '';
+      const current = Number(cell.getAttribute('data-value') || 0);
+      const next = current === 1 ? 0 : 1;
+
+      cell.disabled = true;
+      try {
+        const response = await fetch('/asistencias/toggle', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            empleado_id: empleadoId,
+            fecha,
+            asistio: next
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          mostrarToastAsistencia(data.message || 'No se pudo registrar la asistencia.', 'error');
+          return;
+        }
+
+        applyCellState(cell, next);
+
+        const row = tabla.querySelector('tr[data-row-empleado="' + empleadoId + '"]');
+        if (row) {
+          if (data.sunday_fecha) {
+            const domingoCell = row.querySelector('button.asistencia-cell[data-fecha="' + data.sunday_fecha + '"]');
+            if (domingoCell) {
+              applyCellState(domingoCell, Number(data.domingo_asistio || 0));
+            }
+          }
+
+          const diasCell = row.querySelector('td[data-field="dias-trabajados"]');
+          const importeCell = row.querySelector('td[data-field="importe"]');
+          const netoCell = row.querySelector('td[data-field="neto"]');
+          if (diasCell) diasCell.textContent = Number(data.dias_trabajados || 0).toFixed(1);
+          if (importeCell) importeCell.textContent = toMoney(data.importe || 0);
+          if (netoCell) netoCell.textContent = toMoney(data.neto || 0);
+        }
+
+        recalcularResumenMonto();
+      } catch (err) {
+        mostrarToastAsistencia('Error de conexion al actualizar asistencia.', 'error');
+      } finally {
+        cell.disabled = false;
+      }
+    }
+
+    async function guardarAjustes(input) {
+      const row = input.closest('tr[data-row-empleado]');
+      if (!row) return;
+
+      const empleadoId = Number(row.getAttribute('data-row-empleado') || 0);
+      const payload = {
+        empleado_id: empleadoId,
+        periodo_inicio: periodoInicio,
+        bonificacion: 0,
+        adelanto: 0,
+        descuentos: 0
+      };
+
+      row.querySelectorAll('input.ajuste-input').forEach((item) => {
+        const key = item.getAttribute('data-ajuste');
+        payload[key] = Number(item.value || 0);
+      });
+
+      input.disabled = true;
+      try {
+        const response = await fetch('/asistencias/ajustes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          mostrarToastAsistencia(data.message || 'No se pudo guardar el ajuste.', 'error');
+          return;
+        }
+
+        const diasCell = row.querySelector('td[data-field="dias-trabajados"]');
+        const importeCell = row.querySelector('td[data-field="importe"]');
+        const netoCell = row.querySelector('td[data-field="neto"]');
+        if (diasCell) diasCell.textContent = Number(data.dias_trabajados || 0).toFixed(1);
+        if (importeCell) importeCell.textContent = toMoney(data.importe || 0);
+        if (netoCell) netoCell.textContent = toMoney(data.neto || 0);
+        recalcularResumenMonto();
+      } catch (err) {
+        mostrarToastAsistencia('Error de conexion al guardar ajustes.', 'error');
+      } finally {
+        input.disabled = false;
+      }
+    }
+
+    tabla.querySelectorAll('button.asistencia-cell').forEach((cell) => {
+      cell.addEventListener('click', function() {
+        toggleAsistencia(cell);
+      });
+    });
+
+    tabla.querySelectorAll('input.ajuste-input').forEach((input) => {
+      input.addEventListener('change', function() {
+        guardarAjustes(input);
+      });
+    });
+
+    recalcularResumenMonto();
+  })();
+</script>
+
+<style>
+  #asistencias-modulo .table-responsive {
+    padding: 0 6px 10px;
+  }
+
+  .asistencia-table {
+    margin-bottom: 0;
+  }
+
+  .asistencia-table th,
+  .asistencia-table td {
+    padding: 5px 4px;
+    vertical-align: middle;
+  }
+
+  .asistencia-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+    gap: 10px;
+    padding: 0 16px 16px;
+  }
+
+  .asistencia-summary-grid article {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .asistencia-summary-grid article span {
+    font-size: 12px;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .asistencia-summary-grid article strong {
+    font-size: 18px;
+    color: #0f172a;
+  }
+
+  .asistencia-table th {
+    white-space: nowrap;
+    text-align: center;
+    vertical-align: middle;
+    font-size: 11px;
+    line-height: 1.1;
+  }
+
+  .asistencia-table th.text-center,
+  .asistencia-table td.text-center {
+    min-width: 24px;
+    width: 24px;
+  }
+
+  .asistencia-table th small {
+    display: block;
+    color: #64748b;
+    font-weight: 500;
+    margin-top: 1px;
+    font-size: 10px;
+  }
+
+  .asistencia-cell {
+    width: 22px;
+    min-width: 22px;
+    height: 22px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    padding: 0;
+  }
+
+  .asistencia-cell.is-on {
+    background: #16a34a;
+    border-color: #15803d;
+    color: #fff;
+  }
+
+  .asistencia-cell.is-off {
+    background: #fff;
+    color: #64748b;
+  }
+
+  .asistencia-cell.is-sunday {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    color: #1d4ed8;
+    cursor: pointer;
+  }
+
+  .asistencia-cell:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  .col-fija {
+    min-width: 180px;
+    position: sticky;
+    left: 0;
+    background: #fff;
+    z-index: 2;
+    padding-left: 6px !important;
+    font-size: 12px;
+    line-height: 1.1;
+  }
+
+  .col-ajuste {
+    min-width: 70px;
+    text-align: center;
+  }
+
+  .col-ajuste .badge {
+    font-size: 11px;
+    padding: 4px 6px;
+  }
+
+  .asistencia-table td.fw-semibold,
+  .asistencia-table td.fw-bold {
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  #asistenciaPrintReport .module-print-table {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  #asistenciaPrintReport .module-print-table th,
+  #asistenciaPrintReport .module-print-table td {
+    vertical-align: middle;
+    padding: 7px 8px;
+    line-height: 1.2;
+  }
+
+  #asistenciaPrintReport .module-print-table th:nth-child(2),
+  #asistenciaPrintReport .module-print-table td:nth-child(2),
+  #asistenciaPrintReport .module-print-table th:nth-child(3),
+  #asistenciaPrintReport .module-print-table td:nth-child(3) {
+    text-align: left;
+  }
+
+  #asistenciaPrintReport .module-print-table th:nth-child(1),
+  #asistenciaPrintReport .module-print-table td:nth-child(1),
+  #asistenciaPrintReport .module-print-table th:nth-child(4),
+  #asistenciaPrintReport .module-print-table td:nth-child(4) {
+    text-align: center;
+  }
+
+  #asistenciaPrintReport .module-print-table th:nth-child(n+5),
+  #asistenciaPrintReport .module-print-table td:nth-child(n+5) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 992px) {
+    .asistencia-summary-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .col-fija {
+      position: static;
+      min-width: 200px;
+    }
+  }
+
+  @media print {
+    .page-header,
+    #asistencias-modulo {
+      display: none !important;
+    }
+
+    .print-only {
+      display: block !important;
+    }
+
+    @page {
+      size: A4 landscape;
+      margin: 10mm;
+    }
+  }
+</style>
