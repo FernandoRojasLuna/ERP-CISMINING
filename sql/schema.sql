@@ -1,7 +1,3 @@
-DROP DATABASE IF EXISTS construction_suite;
-CREATE DATABASE construction_suite CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE construction_suite;
-
 CREATE TABLE proyectos (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nombre VARCHAR(150) NOT NULL,

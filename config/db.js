@@ -9,7 +9,9 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'construction_suite',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  // AGREGA ESTO AQUÍ ABAJO:
+  ssl: process.env.DB_HOST ? { rejectUnauthorized: false } : false
 });
 
 module.exports = pool;
