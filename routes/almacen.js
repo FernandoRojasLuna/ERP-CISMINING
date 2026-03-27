@@ -526,7 +526,8 @@ router.post('/materiales', requireRole('admin'), async (req, res, next) => {
 router.get('/proveedores/lista', requireRole('admin'), async (req, res, next) => {
   try {
     const [proveedores] = await db.query(
-      'SELECT id, nombre, ruc, contacto, telefono, email, direccion, estado FROM proveedores WHERE estado = "Activo" ORDER BY nombre'
+      'SELECT id, nombre, ruc, contacto, telefono, email, direccion, estado FROM proveedores WHERE estado = ? ORDER BY nombre',
+      ['Activo']
     );
     res.json({ 
       success: true, 
@@ -1137,7 +1138,7 @@ router.get('/movimientos/:id_proyecto/entradas', requireRole('admin'), async (re
       ORDER BY m.nombre
     `, [proyectoId]);
 
-    const [proveedores] = await conn.query('SELECT id, nombre, ruc FROM proveedores WHERE estado = "Activo" ORDER BY nombre');
+    const [proveedores] = await conn.query('SELECT id, nombre, ruc FROM proveedores WHERE estado = ? ORDER BY nombre', ['Activo']);
 
     const [entradas] = await conn.query(`
       SELECT
@@ -1341,7 +1342,7 @@ router.get('/movimientos/:id_proyecto/salidas', requireRole('admin'), async (req
       ORDER BY m.nombre
     `, [proyectoId]);
 
-    const [proveedores] = await conn.query('SELECT id, nombre, ruc FROM proveedores WHERE estado = "Activo" ORDER BY nombre');
+    const [proveedores] = await conn.query('SELECT id, nombre, ruc FROM proveedores WHERE estado = ? ORDER BY nombre', ['Activo']);
 
     const [salidas] = await conn.query(`
       SELECT
