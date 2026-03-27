@@ -904,6 +904,8 @@
     var grupoSelect = document.getElementById('catalogGrupoSelect');
     var subgrupoSelect = document.getElementById('catalogSubgrupoSelect');
     var unidadSelect = document.getElementById('catalogUnidadSelect');
+    var addGrupoBtn = document.querySelector('.catalog-add-btn[data-catalog-type="grupo"]');
+    var addSubgrupoBtn = document.querySelector('.catalog-add-btn[data-catalog-type="subgrupo"]');
 
     if (!modalEl || !form || !tipoInput || !parentTipoInput || !parentValorInput || !tipoChip || !valorInput || !titleEl || !parentWrap || !parentLabel || !crearPadreBtn || !familiaSelect || !grupoSelect || !subgrupoSelect || !unidadSelect) {
       return;
@@ -966,14 +968,39 @@
       select.appendChild(option);
     }
 
+    function syncHierarchyLockState() {
+      var selectedFamilia = normalize(familiaSelect.value);
+      var selectedGrupo = normalize(grupoSelect.value);
+      var hasFamilia = Boolean(selectedFamilia);
+      var hasGrupo = Boolean(selectedGrupo);
+
+      grupoSelect.disabled = !hasFamilia;
+      subgrupoSelect.disabled = !hasGrupo;
+
+      if (addGrupoBtn) {
+        addGrupoBtn.disabled = !hasFamilia;
+      }
+      if (addSubgrupoBtn) {
+        addSubgrupoBtn.disabled = !hasGrupo;
+      }
+    }
+
     function rebuildGrupoOptions() {
       var selectedFamilia = normalize(familiaSelect.value);
       var prevGrupo = normalize(grupoSelect.value);
       grupoSelect.innerHTML = '<option value="">Selecciona grupo</option>';
 
+      if (!selectedFamilia) {
+        grupoSelect.value = '';
+        subgrupoSelect.innerHTML = '<option value="">Selecciona subgrupo</option>';
+        subgrupoSelect.value = '';
+        syncHierarchyLockState();
+        return;
+      }
+
       gruposCatalogo
         .filter(function(item) {
-          return !selectedFamilia || !item.parentFamilia || item.parentFamilia === selectedFamilia;
+          return item.parentFamilia === selectedFamilia;
         })
         .sort(function(a, b) { return a.value.localeCompare(b.value); })
         .forEach(function(item) {
@@ -989,6 +1016,8 @@
       } else {
         grupoSelect.value = '';
       }
+
+      syncHierarchyLockState();
     }
 
     function rebuildSubgrupoOptions() {
@@ -996,9 +1025,15 @@
       var prevSubgrupo = normalize(subgrupoSelect.value);
       subgrupoSelect.innerHTML = '<option value="">Selecciona subgrupo</option>';
 
+      if (!selectedGrupo) {
+        subgrupoSelect.value = '';
+        syncHierarchyLockState();
+        return;
+      }
+
       subgruposCatalogo
         .filter(function(item) {
-          return !selectedGrupo || !item.parentGrupo || item.parentGrupo === selectedGrupo;
+          return item.parentGrupo === selectedGrupo;
         })
         .sort(function(a, b) { return a.value.localeCompare(b.value); })
         .forEach(function(item) {
@@ -1014,6 +1049,8 @@
       } else {
         subgrupoSelect.value = '';
       }
+
+      syncHierarchyLockState();
     }
 
     function openCatalogModal(tipo, parentTipo, parentValor) {
@@ -1186,6 +1223,7 @@
 
     rebuildGrupoOptions();
     rebuildSubgrupoOptions();
+    syncHierarchyLockState();
   })();
 
   (function initCatalogFilters() {

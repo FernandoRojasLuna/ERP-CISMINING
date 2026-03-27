@@ -283,6 +283,56 @@ async function getCatalogos(conn) {
   };
 }
 
+async function validateMaterialHierarchy(conn, familia, grupoMaterial, subgrupo) {
+  const familiaFinal = toUpperTrim(familia);
+  const grupoFinal = toUpperTrim(grupoMaterial);
+  const subgrupoFinal = toUpperTrim(subgrupo);
+
+  if (!familiaFinal) {
+    return { valid: false, error: 'Debe seleccionar una familia.' };
+  }
+  if (!grupoFinal) {
+    return { valid: false, error: 'Debe seleccionar un grupo.' };
+  }
+  if (!subgrupoFinal) {
+    return { valid: false, error: 'Debe seleccionar un subgrupo.' };
+  }
+
+  const [[grupoExiste]] = await conn.query(
+    `
+    SELECT COUNT(*) AS total
+    FROM almacen_catalogos
+    WHERE tipo = 'GRUPO'
+      AND valor = ?
+      AND parent_tipo = 'FAMILIA'
+      AND parent_valor = ?
+    `,
+    [grupoFinal, familiaFinal]
+  );
+
+  if (Number(grupoExiste?.total || 0) === 0) {
+    return { valid: false, error: `El grupo ${grupoFinal} no pertenece a la familia ${familiaFinal}.` };
+  }
+
+  const [[subgrupoExiste]] = await conn.query(
+    `
+    SELECT COUNT(*) AS total
+    FROM almacen_catalogos
+    WHERE tipo = 'SUBGRUPO'
+      AND valor = ?
+      AND parent_tipo = 'GRUPO'
+      AND parent_valor = ?
+    `,
+    [subgrupoFinal, grupoFinal]
+  );
+
+  if (Number(subgrupoExiste?.total || 0) === 0) {
+    return { valid: false, error: `El subgrupo ${subgrupoFinal} no pertenece al grupo ${grupoFinal}.` };
+  }
+
+  return { valid: true, familiaFinal, grupoFinal, subgrupoFinal };
+}
+
 async function loadAlmacenData(conn) {
   const [materiales] = await conn.query(`
     SELECT *
@@ -495,6 +545,24 @@ router.post('/materiales', requireRole('admin'), async (req, res, next) => {
       subgrupo,
       unidad
     } = req.body;
+
+    const nombreFinal = toUpperTrim(nombre);
+    const unidadFinal = toUpperTrim(unidad);
+    if (!nombreFinal || !unidadFinal) {
+      return res.status(400).render('partials/error', {
+        title: 'Error',
+        error: 'Debe completar nombre y unidad para registrar el material.'
+      });
+    }
+
+    const hierarchy = await validateMaterialHierarchy(db, familia, grupo_material, subgrupo);
+    if (!hierarchy.valid) {
+      return res.status(400).render('partials/error', {
+        title: 'Error',
+        error: hierarchy.error
+      });
+    }
+
     const codigoFinal = await getNextMaterialCode();
 
     await db.query(
@@ -505,12 +573,12 @@ router.post('/materiales', requireRole('admin'), async (req, res, next) => {
       `,
       [
         codigoFinal,
-        toUpperTrim(nombre),
-        toUpperTrim(familia),
-        toUpperTrim(grupo_material),
-        toUpperTrim(subgrupo),
-        toUpperTrim(familia),
-        toUpperTrim(unidad),
+        nombreFinal,
+        hierarchy.familiaFinal,
+        hierarchy.grupoFinal,
+        hierarchy.subgrupoFinal,
+        hierarchy.familiaFinal,
+        unidadFinal,
         0,
         0,
         0
@@ -687,6 +755,23 @@ router.put('/materiales/:id', requireRole('admin'), async (req, res, next) => {
       unidad
     } = req.body;
 
+    const nombreFinal = toUpperTrim(nombre);
+    const unidadFinal = toUpperTrim(unidad);
+    if (!nombreFinal || !unidadFinal) {
+      return res.status(400).render('partials/error', {
+        title: 'Error',
+        error: 'Debe completar nombre y unidad para actualizar el material.'
+      });
+    }
+
+    const hierarchy = await validateMaterialHierarchy(db, familia, grupo_material, subgrupo);
+    if (!hierarchy.valid) {
+      return res.status(400).render('partials/error', {
+        title: 'Error',
+        error: hierarchy.error
+      });
+    }
+
     const [[materialActual]] = await db.query('SELECT codigo, stock_actual, stock_minimo, costo_unitario FROM materiales WHERE id = ?', [req.params.id]);
     if (!materialActual) {
       return res.status(404).render('partials/error', {
@@ -705,12 +790,12 @@ router.put('/materiales/:id', requireRole('admin'), async (req, res, next) => {
       `,
       [
         codigoFinal,
-        toUpperTrim(nombre),
-        toUpperTrim(familia),
-        toUpperTrim(grupo_material),
-        toUpperTrim(subgrupo),
-        toUpperTrim(familia),
-        toUpperTrim(unidad),
+        nombreFinal,
+        hierarchy.familiaFinal,
+        hierarchy.grupoFinal,
+        hierarchy.subgrupoFinal,
+        hierarchy.familiaFinal,
+        unidadFinal,
         materialActual.stock_actual || 0,
         materialActual.stock_minimo || 0,
         materialActual.costo_unitario || 0,
