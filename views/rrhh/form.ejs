@@ -1,8 +1,19 @@
 <div class="rrhh-user-shell">
+    <%
+        const isEdit = Boolean(typeof usuario !== 'undefined' && usuario && usuario.id);
+        const hasUsuarioObject = Boolean(typeof usuario !== 'undefined' && usuario);
+        const hasAccessFlag = hasUsuarioObject && Object.prototype.hasOwnProperty.call(usuario, 'tiene_acceso_sistema');
+        const rawAccessValue = hasAccessFlag ? usuario.tiene_acceso_sistema : null;
+        const createSystemAccess = isEdit
+            ? true
+            : (hasAccessFlag
+                ? (rawAccessValue === true || rawAccessValue === 1 || rawAccessValue === '1' || rawAccessValue === 'on' || rawAccessValue === 'true')
+                : !hasUsuarioObject);
+    %>
     <div class="page-header rrhh-user-header">
         <div class="page-header-title">
-            <h1><%= (typeof usuario !== 'undefined' && usuario) ? 'Editar usuario' : 'Nuevo usuario' %></h1>
-            <p><%= (typeof usuario !== 'undefined' && usuario) ? 'Actualiza el acceso al sistema y los datos laborales del empleado.' : 'Crea una cuenta de acceso y registra la información base del empleado.' %></p>
+            <h1><%= isEdit ? 'Editar usuario' : 'Nuevo usuario' %></h1>
+            <p><%= isEdit ? 'Actualiza el acceso al sistema y los datos laborales del empleado.' : 'Registra al trabajador y define si también tendrá acceso al sistema.' %></p>
         </div>
         <a href="/rrhh" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Volver</a>
     </div>
@@ -13,13 +24,13 @@
                 <%= ((typeof usuario !== 'undefined' && usuario ? usuario.username : 'NU') || 'NU').slice(0,2).toUpperCase() %>
             </div>
             <div class="rrhh-user-hero-copy">
-                <h2><%= (typeof usuario !== 'undefined' && usuario) ? usuario.username : 'Nuevo acceso del sistema' %></h2>
-                <p><%= (typeof usuario !== 'undefined' && usuario) ? 'Gestiona credenciales, rol y estado de la cuenta.' : 'Define el rol, la contraseña inicial y la asignación del empleado.' %></p>
+                <h2><%= isEdit ? usuario.username : 'Nuevo registro de trabajador' %></h2>
+                <p><%= isEdit ? 'Gestiona credenciales, rol y estado de la cuenta.' : 'Puedes registrar solo al trabajador o crear también su cuenta de acceso.' %></p>
             </div>
             <div class="rrhh-user-hero-meta">
-                <span class="badge badge-secondary"><i class="bi bi-person-badge"></i> <%= (typeof usuario !== 'undefined' && usuario) ? 'Edición' : 'Alta' %></span>
-                <span class="badge <%= (typeof usuario !== 'undefined' && usuario && usuario.role === 'admin') ? 'badge-primary' : 'badge-warning' %>"><i class="bi bi-shield-check"></i> <%= (typeof usuario !== 'undefined' && usuario && usuario.role) ? usuario.role : 'Pendiente' %></span>
-                <% if (typeof usuario !== 'undefined' && usuario) { %>
+                <span class="badge badge-secondary"><i class="bi bi-person-badge"></i> <%= isEdit ? 'Edición' : 'Alta' %></span>
+                <span class="badge <%= (typeof usuario !== 'undefined' && usuario && usuario.role === 'admin') ? 'badge-primary' : (createSystemAccess ? 'badge-warning' : 'badge-secondary') %>"><i class="bi bi-shield-check"></i> <%= isEdit ? (usuario.role || 'Pendiente') : (createSystemAccess ? 'Con acceso' : 'Sin acceso') %></span>
+                <% if (isEdit) { %>
                     <span class="badge <%= usuario.activo ? 'badge-success' : 'badge-danger' %>"><i class="bi bi-circle-fill"></i> <%= usuario.activo ? 'Activo' : 'Inactivo' %></span>
                 <% } %>
             </div>
@@ -41,7 +52,24 @@
     <% } %>
 
     <form method="POST" action="<%= (typeof usuario !== 'undefined' && usuario) ? '/rrhh/usuarios/' + usuario.id + '?_method=PUT' : '/rrhh/usuarios' %>" class="rrhh-user-form">
-        <div class="form-section">
+        <% if (!isEdit) { %>
+            <div class="form-section">
+                <div class="form-section-title"><i class="bi bi-person-check"></i> Acceso al sistema</div>
+                <div class="form-section-body">
+                    <label class="rrhh-switch-card" for="tiene_acceso_sistema">
+                        <div>
+                            <div class="rrhh-switch-title">Crear cuenta para iniciar sesión</div>
+                            <div class="field-hint mb-0">Actívalo para registrar usuario, contraseña y rol (Admin u Operario). Si lo desactivas, solo se creará el trabajador.</div>
+                        </div>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" id="tiene_acceso_sistema" name="tiene_acceso_sistema" value="1" <%= createSystemAccess ? 'checked' : '' %>>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        <% } %>
+
+        <div class="form-section" id="accesoSistemaSection" <%= (!isEdit && !createSystemAccess) ? 'style="display:none;"' : '' %>>
             <div class="form-section-title"><i class="bi bi-shield-lock"></i> Acceso al sistema</div>
             <div class="form-section-body">
                 <div class="row g-3">
@@ -51,14 +79,14 @@
                             class="form-control"
                             id="username"
                             name="username"
-                            value="<%= (typeof usuario !== 'undefined' && usuario) ? usuario.username : '' %>"
-                            <% if (typeof usuario !== 'undefined' && usuario) { %>disabled<% } %>
+                            value="<%= (typeof usuario !== 'undefined' && usuario && usuario.username) ? usuario.username : '' %>"
+                            <% if (isEdit) { %>disabled<% } %>
                             placeholder="Ej. juan_diaz"
-                            required>
+                            <%= (!isEdit && createSystemAccess) ? 'required' : '' %>>
                         <div class="field-hint">Usa 3 o más caracteres. Solo letras, números, guiones y guion bajo.</div>
                     </div>
 
-                    <% if (typeof usuario === 'undefined' || !usuario) { %>
+                    <% if (!isEdit) { %>
                         <div class="col-lg-6">
                             <label for="password" class="form-label">Contraseña inicial</label>
                             <input type="password"
@@ -66,7 +94,7 @@
                                 id="password"
                                 name="password"
                                 placeholder="Mínimo 6 caracteres"
-                                required>
+                                <%= createSystemAccess ? 'required' : '' %>>
                             <div class="field-hint">Se almacenará cifrada y se usará para el primer acceso del usuario.</div>
                         </div>
                     <% } else { %>
@@ -86,10 +114,10 @@
 
                     <div class="col-lg-6">
                         <label for="role" class="form-label">Rol</label>
-                        <select class="form-select" id="role" name="role" required>
+                        <select class="form-select" id="role" name="role" <%= (isEdit || createSystemAccess) ? 'required' : '' %>>
                             <option value="">Selecciona un rol</option>
                             <option value="admin" <%= (typeof usuario !== 'undefined' && usuario && usuario.role === 'admin') ? 'selected' : '' %>>Administrador</option>
-                            <option value="usuario" <%= (typeof usuario !== 'undefined' && usuario && usuario.role === 'usuario') ? 'selected' : '' %>>Usuario operativo</option>
+                            <option value="usuario" <%= (typeof usuario !== 'undefined' && usuario && usuario.role === 'usuario') ? 'selected' : '' %>>Operario</option>
                         </select>
                     </div>
                 </div>
@@ -158,7 +186,7 @@
             </div>
         </div>
 
-        <% if (typeof usuario !== 'undefined' && usuario) { %>
+        <% if (isEdit) { %>
             <div class="form-section">
                 <div class="form-section-title"><i class="bi bi-toggles"></i> Estado de la cuenta</div>
                 <div class="form-section-body">
@@ -179,14 +207,14 @@
             <a href="/rrhh" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i> Cancelar</a>
             <button type="submit" class="btn btn-primary">
                 <i class="bi bi-floppy"></i>
-                <%= (typeof usuario !== 'undefined' && usuario) ? 'Guardar cambios' : 'Crear usuario' %>
+                <%= isEdit ? 'Guardar cambios' : (createSystemAccess ? 'Crear usuario' : 'Registrar trabajador') %>
             </button>
         </div>
     </form>
 </div>
 
 <!-- Modal para cambiar contraseña -->
-<% if (typeof usuario !== 'undefined' && usuario) { %>
+<% if (isEdit) { %>
     <div class="modal fade" id="modalCambiarPassword" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -254,4 +282,40 @@
         }
     });
     </script>
+<% } %>
+
+<% if (!isEdit) { %>
+<script>
+(() => {
+    const accessSwitch = document.getElementById('tiene_acceso_sistema');
+    const accessSection = document.getElementById('accesoSistemaSection');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const roleInput = document.getElementById('role');
+
+    if (!accessSwitch || !accessSection) return;
+
+    function syncAccessSection() {
+        const enabled = accessSwitch.checked;
+        accessSection.style.display = enabled ? '' : 'none';
+
+        if (usernameInput) {
+            usernameInput.required = enabled;
+            usernameInput.disabled = !enabled;
+        }
+        if (passwordInput) {
+            passwordInput.required = enabled;
+            passwordInput.disabled = !enabled;
+        }
+        if (roleInput) {
+            roleInput.required = enabled;
+            roleInput.disabled = !enabled;
+            if (!enabled) roleInput.value = '';
+        }
+    }
+
+    accessSwitch.addEventListener('change', syncAccessSection);
+    syncAccessSection();
+})();
+</script>
 <% } %>

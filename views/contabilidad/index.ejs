@@ -336,7 +336,7 @@
           </div>
           <div class="col-md-2">
             <label class="form-label">Centro de costo</label>
-            <select name="centro" class="form-select">
+            <select name="centro" class="form-select" onchange="this.form.submit()">
               <option value="consolidado" <%= filtros?.centro === 'consolidado' ? 'selected' : '' %>>Consolidado General</option>
               <option value="admin" <%= filtros?.centro === 'admin' ? 'selected' : '' %>>Oficina Central</option>
               <% if (typeof proyectos !== 'undefined' && Array.isArray(proyectos)) { %>

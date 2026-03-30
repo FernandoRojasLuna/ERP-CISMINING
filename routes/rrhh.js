@@ -10,6 +10,13 @@ async function getProyectos() {
   return Array.isArray(rows) ? rows : [];
 }
 
+function shouldCreateSystemUser(req) {
+  const raw = req?.body?.tiene_acceso_sistema;
+  if (raw === true || raw === 1) return true;
+  const normalized = String(raw || '').toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'on';
+}
+
 async function ensureAsistenciasSchema() {
   await db.query(`
     CREATE TABLE IF NOT EXISTS rrhh_asistencias (
@@ -519,15 +526,38 @@ router.get('/usuarios/:id/editar', requireRole('admin'), async (req, res, next) 
 // POST /usuarios - Crear nuevo usuario
 router.post('/usuarios', requireRole('admin'), [
   body('username')
-    .trim()
-    .notEmpty().withMessage('El usuario es requerido')
-    .isLength({ min: 3 }).withMessage('El usuario debe tener al menos 3 caracteres')
-    .matches(/^[a-zA-Z0-9_-]+$/).withMessage('Solo letras, números, guiones y guiones bajos'),
+    .custom((value, { req }) => {
+      if (!shouldCreateSystemUser(req)) return true;
+
+      const username = String(value || '').trim();
+      if (!username) throw new Error('El usuario es requerido');
+      if (username.length < 3) throw new Error('El usuario debe tener al menos 3 caracteres');
+      if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+        throw new Error('Solo letras, números, guiones y guiones bajos');
+      }
+
+      req.body.username = username;
+      return true;
+    }),
   body('password')
-    .notEmpty().withMessage('La contraseña es requerida')
-    .isLength({ min: 6 }).withMessage('La contraseña debe tener al menos 6 caracteres'),
+    .custom((value, { req }) => {
+      if (!shouldCreateSystemUser(req)) return true;
+
+      const password = String(value || '');
+      if (!password) throw new Error('La contraseña es requerida');
+      if (password.length < 6) throw new Error('La contraseña debe tener al menos 6 caracteres');
+      return true;
+    }),
   body('role')
-    .isIn(['admin', 'usuario']).withMessage('Rol inválido'),
+    .custom((value, { req }) => {
+      if (!shouldCreateSystemUser(req)) return true;
+
+      if (!['admin', 'usuario'].includes(value)) {
+        throw new Error('Rol inválido');
+      }
+
+      return true;
+    }),
   body('nombre')
     .trim()
     .notEmpty().withMessage('El nombre del empleado es requerido'),
@@ -546,7 +576,10 @@ router.post('/usuarios', requireRole('admin'), [
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       res.locals.proyectos = await getProyectos();
-      res.locals.usuario = req.body;
+      res.locals.usuario = {
+        ...req.body,
+        tiene_acceso_sistema: shouldCreateSystemUser(req) ? '1' : '0'
+      };
       res.locals.errors = errors.array();
 
       return res.status(400).render('rrhh/form', {
@@ -555,28 +588,31 @@ router.post('/usuarios', requireRole('admin'), [
     }
 
     const { username, password, role, nombre, cargo, salario, proyecto_id, estado } = req.body;
+    const crearAccesoSistema = shouldCreateSystemUser(req);
 
-    // Verificar si el usuario ya existe
-    let existingUser = null;
-    try {
-      const [rows] = await db.query('SELECT id FROM users WHERE username = ?', [username]);
-      existingUser = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
-    } catch (dbError) {
-      console.error('Error verificando usuario:', dbError);
+    if (crearAccesoSistema) {
+      // Verificar si el usuario ya existe
+      let existingUser = null;
+      try {
+        const [rows] = await db.query('SELECT id FROM users WHERE username = ?', [username]);
+        existingUser = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+      } catch (dbError) {
+        console.error('Error verificando usuario:', dbError);
+      }
+
+      if (existingUser) {
+        res.locals.proyectos = await getProyectos();
+        res.locals.usuario = {
+          ...req.body,
+          tiene_acceso_sistema: '1'
+        };
+        res.locals.errors = [{ msg: 'Este usuario ya existe en el sistema' }];
+
+        return res.status(400).render('rrhh/form', {
+          title: 'Nuevo Usuario'
+        });
+      }
     }
-
-    if (existingUser) {
-      res.locals.proyectos = await getProyectos();
-      res.locals.usuario = req.body;
-      res.locals.errors = [{ msg: 'Este usuario ya existe en el sistema' }];
-
-      return res.status(400).render('rrhh/form', {
-        title: 'Nuevo Usuario'
-      });
-    }
-
-    // Hashear contraseña
-    const hashedPassword = await bcrypt.hash(password, 10);
 
     // Crear empleado y vincularlo al usuario
     const [empleadoResult] = await db.query(
@@ -585,13 +621,20 @@ router.post('/usuarios', requireRole('admin'), [
     );
     const empleadoId = empleadoResult.insertId;
 
-    // Insertar nuevo usuario
-    await db.query(
-      'INSERT INTO users (username, password, role, empleado_id, activo) VALUES (?, ?, ?, ?, 1)',
-      [username, hashedPassword, role, empleadoId]
-    );
+    if (crearAccesoSistema) {
+      // Hashear contraseña solo cuando se crea acceso de sistema
+      const hashedPassword = await bcrypt.hash(password, 10);
 
-    res.redirect('/rrhh?message=' + encodeURIComponent('✓ Usuario creado exitosamente'));
+      // Insertar nuevo usuario
+      await db.query(
+        'INSERT INTO users (username, password, role, empleado_id, activo) VALUES (?, ?, ?, ?, 1)',
+        [username, hashedPassword, role, empleadoId]
+      );
+
+      return res.redirect('/rrhh?message=' + encodeURIComponent('✓ Usuario creado exitosamente'));
+    }
+
+    return res.redirect('/rrhh?message=' + encodeURIComponent('✓ Trabajador registrado sin acceso al sistema'));
   } catch (error) { 
     console.error('Error creando usuario:', error);
     next(error); 
