@@ -42,6 +42,7 @@ app.use('/almacen', requireAuth, require('./routes/almacen'));
 app.use('/rrhh', requireAuth, require('./routes/rrhh'));
 app.use('/asistencias', requireAuth, require('./routes/asistencias'));
 app.use('/contabilidad', requireAuth, require('./routes/contabilidad'));
+app.use('/caja-chica', requireAuth, require('./routes/caja_chica'));
 app.use('/documentos', requireAuth, require('./routes/documentos'));
 app.use('/reportes', requireAuth, require('./routes/reportes'));
 app.use('/gantt', requireAuth, require('./routes/gantt'));

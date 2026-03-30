@@ -644,6 +644,73 @@ body.sidebar-collapsed .sidebar-footer span {
 .btn-sm { padding: 5px 11px; font-size: .78rem; }
 .btn-xs { padding: 3px 8px; font-size: .73rem; border-radius: 6px; }
 
+.action-shortcut-card {
+  position: relative;
+  border: 1px solid var(--border);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.action-shortcut-card .panel-body {
+  padding: 16px 18px;
+}
+
+.action-shortcut-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(15,23,42,.10);
+}
+
+.action-shortcut-tag {
+  display: inline-block;
+  font-size: .64rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+
+.action-shortcut-title {
+  font-weight: 800;
+  color: var(--text);
+  font-size: .92rem;
+  margin-bottom: 6px;
+}
+
+.action-shortcut-copy {
+  color: var(--muted);
+  font-size: .79rem;
+  line-height: 1.45;
+  min-height: 34px;
+}
+
+.action-shortcut-btn {
+  width: 100%;
+  justify-content: center;
+  border: 1px solid #c7d2fe;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-weight: 700;
+}
+
+.action-shortcut-btn:hover {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.action-shortcut-primary { border-top: 3px solid #2563eb; }
+.action-shortcut-primary .action-shortcut-tag { background: #dbeafe; color: #1d4ed8; }
+
+.action-shortcut-info { border-top: 3px solid #0891b2; }
+.action-shortcut-info .action-shortcut-tag { background: #cffafe; color: #155e75; }
+
+.action-shortcut-success { border-top: 3px solid #16a34a; }
+.action-shortcut-success .action-shortcut-tag { background: #dcfce7; color: #166534; }
+
+.action-shortcut-neutral { border-top: 3px solid #475569; }
+.action-shortcut-neutral .action-shortcut-tag { background: #e2e8f0; color: #334155; }
+
 /* ── FORMS ─────────────────────────────────────────────── */
 .form-label {
   font-size: .8rem;

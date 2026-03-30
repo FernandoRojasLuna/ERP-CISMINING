@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= title %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    .pdf-kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .pdf-kpi-item {
+      border: 1px solid #dbe5f0;
+      border-radius: 8px;
+      background: #fff;
+      padding: 6px 8px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 52px;
+    }
+
+    .pdf-kpi-icon {
+      width: 18px;
+      text-align: center;
+      color: #2563eb;
+      font-size: .9rem;
+      line-height: 1;
+    }
+
+    .pdf-kpi-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .pdf-kpi-copy span {
+      font-size: .64rem;
+      color: #64748b;
+      line-height: 1.1;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+
+    .pdf-kpi-copy strong {
+      font-size: 1.02rem;
+      color: #0f172a;
+      line-height: 1.05;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <section class="module-print-report">
+    <div class="module-print-banner">
+      <div class="module-print-brand">
+        <div class="module-print-logo" aria-hidden="true">
+          <svg viewBox="0 0 64 64" role="img" focusable="false">
+            <rect x="2" y="2" width="60" height="60" rx="14" fill="#0f172a"></rect>
+            <path d="M18 44V20h8l6 8 6-8h8v24h-8V33l-6 8-6-8v11h-8z" fill="#f8fafc"></path>
+            <rect x="12" y="48" width="40" height="5" rx="2.5" fill="#d4a017"></rect>
+          </svg>
+        </div>
+        <div>
+          <p class="module-print-company">Cismining</p>
+          <p class="module-print-system">ERP Construcción</p>
+        </div>
+      </div>
+      <div class="module-print-docmeta">
+        <span>DOC-CAJA CHICA</span>
+        <strong>Version 1.0</strong>
+      </div>
+    </div>
+
+    <div class="module-print-head">
+      <div>
+        <p class="module-print-eyebrow">Documento corporativo</p>
+        <h2><%= esConsolidado ? 'Reporte Consolidado - Caja Chica' : 'Reporte de Caja Chica' %></h2>
+        <p><%= esConsolidado ? 'Estado consolidado de fondos, gastos y liquidaciones de todas las obras.' : 'Análisis detallado de fondos y movimientos para control operativo.' %></p>
+      </div>
+      <div class="module-print-meta-right">
+        <div><strong>Emitido:</strong> <%= emitido %></div>
+        <div><strong>Periodo:</strong> <%= filtros?.desde || '-' %> a <%= filtros?.hasta || '-' %></div>
+        <% if (!esConsolidado) { %>
+          <div><strong>Obra:</strong> <%= fondo?.proyecto_nombre || 'N/A' %></div>
+        <% } %>
+      </div>
+    </div>
+
+    <%
+      const fondoTotalConsolidado = (datosProyectos || []).reduce((acc, p) => acc + Number(p.monto_fijo || 0), 0);
+      const saldoTotalConsolidado = (datosProyectos || []).reduce((acc, p) => acc + Number(p.saldo_actual || 0), 0);
+      const montoAsignado = esConsolidado ? fondoTotalConsolidado : Number(fondo?.monto_fijo || 0);
+      const saldoEfectivo = esConsolidado ? saldoTotalConsolidado : Number(fondo?.saldo_actual || 0);
+      const gastosPorRendir = Number(reporteResumen?.monto_por_rendir || 0);
+      const rendidos = Number(reporteResumen?.monto_rendido || 0);
+      const nivelCaja = montoAsignado > 0 ? (saldoEfectivo / montoAsignado) * 100 : 0;
+    %>
+    <div class="pdf-kpi-strip">
+      <article class="pdf-kpi-item">
+        <div class="pdf-kpi-icon"><i class="bi bi-cash-stack"></i></div>
+        <div class="pdf-kpi-copy"><span>Monto asignado</span><strong>S/ <%= Number(montoAsignado || 0).toFixed(2) %></strong></div>
+      </article>
+      <article class="pdf-kpi-item">
+        <div class="pdf-kpi-icon"><i class="bi bi-wallet2"></i></div>
+        <div class="pdf-kpi-copy"><span>Saldo en efectivo</span><strong>S/ <%= Number(saldoEfectivo || 0).toFixed(2) %></strong></div>
+      </article>
+      <article class="pdf-kpi-item">
+        <div class="pdf-kpi-icon"><i class="bi bi-receipt"></i></div>
+        <div class="pdf-kpi-copy"><span>Gastos por rendir</span><strong>S/ <%= Number(gastosPorRendir || 0).toFixed(2) %></strong></div>
+      </article>
+      <article class="pdf-kpi-item">
+        <div class="pdf-kpi-icon"><i class="bi bi-arrow-repeat"></i></div>
+        <div class="pdf-kpi-copy"><span>Rendidos</span><strong>S/ <%= Number(rendidos || 0).toFixed(2) %></strong></div>
+      </article>
+      <article class="pdf-kpi-item">
+        <div class="pdf-kpi-icon"><i class="bi bi-speedometer2"></i></div>
+        <div class="pdf-kpi-copy"><span>Nivel de caja</span><strong><%= Number(nivelCaja || 0).toFixed(1) %>%</strong></div>
+      </article>
+    </div>
+
+    <% if (Array.isArray(valesDetalle) && valesDetalle.length > 0) { %>
+      <p class="module-print-subtable-title">Vales recientes del periodo</p>
+      <table class="table table-sm module-print-table">
+        <thead>
+          <tr>
+            <% if (esConsolidado) { %>
+              <th>Obra</th>
+            <% } %>
+            <th>Fecha</th>
+            <th>Beneficiario</th>
+            <th>Categoria</th>
+            <th>Tipo documento</th>
+            <th>Nro documento</th>
+            <th style="text-align: right;">Monto (S/)</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% valesDetalle.forEach((r) => { %>
+            <tr>
+              <% if (esConsolidado) { %>
+                <td><%= r.proyecto_nombre || '-' %></td>
+              <% } %>
+              <td><%= r.fecha ? new Date(r.fecha).toLocaleDateString('es-PE') : '-' %></td>
+              <td><%= r.beneficiario || '-' %></td>
+              <td><%= r.categoria || '-' %></td>
+              <td><strong><%= r.tipo_documento || '-' %></strong></td>
+              <td><%= r.numero_documento || '-' %></td>
+              <td style="text-align: right;"><strong><%= Number(r.monto || 0).toFixed(2) %></strong></td>
+              <td><%= r.estado || '-' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+
+    <% if (esConsolidado && datosProyectos.length > 0) { %>
+      <p class="module-print-subtable-title">Estado por Proyecto</p>
+      <table class="table table-sm module-print-table">
+        <thead>
+          <tr>
+            <th>Proyecto</th>
+            <th style="text-align: right;">Fondo Fijo</th>
+            <th style="text-align: right;">Saldo Actual</th>
+            <th style="text-align: right;">Por Rendir</th>
+            <th style="text-align: right;">Último Reembolso</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% datosProyectos.forEach((p) => { %>
+            <tr>
+              <td><strong><%= p.nombre %></strong></td>
+              <td style="text-align: right;">S/ <%= Number(p.monto_fijo || 0).toFixed(2) %></td>
+              <td style="text-align: right;">S/ <%= Number(p.saldo_actual || 0).toFixed(2) %></td>
+              <td style="text-align: right;">S/ <%= Number(p.total_pendiente || 0).toFixed(2) %></td>
+              <td style="text-align: right;">S/ <%= Number(p.ultimo_reembolso || 0).toFixed(2) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+
+    <div class="module-print-footer">
+      <div>
+        <span class="label">Documento:</span>
+        <strong>Caja Chica</strong>
+      </div>
+      <div>
+        <span class="label">Clasificación:</span>
+        <strong>Uso Interno - Control Operativo</strong>
+      </div>
+    </div>
+  </section>
+
+  <% if (autoPrint) { %>
+    <script>
+      window.addEventListener('load', () => {
+        window.print();
+      });
+    </script>
+  <% } %>
+</body>
+</html>

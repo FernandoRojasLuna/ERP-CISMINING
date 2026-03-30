@@ -1,0 +1,744 @@
+<%
+  const fmtFecha = (value) => {
+    if (!value) return '-';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const fondoMonto = Number(fondo?.monto_fijo || 0);
+  const fondoSaldo = Number(fondo?.saldo_actual || 0);
+  const limiteIndividual = Number(fondo?.limite_gasto_individual || 0);
+  const umbral = Number(fondo?.umbral_alerta_pct || 20);
+  const saldoPct = Number(stats?.saldoPct || 0);
+  const saldoBajo = fondoMonto > 0 && saldoPct <= umbral;
+  const filtrosCaja = filtros || { periodo: 'mes_actual', desde: '', hasta: '' };
+  const reporte = reporteResumen || {};
+  const reporteGeneral = reporteResumenGeneral || {};
+  const panoramaGeneral = panorama || { totalFondo: 0, totalSaldo: 0, totalPendiente: 0, proyectosEnAlerta: 0, proyectosConFondo: 0 };
+  const proyectoSeleccionado = Number(proyectoId || 0) > 0;
+  const totalReporte = Number(reporte.monto_total || 0);
+  const queryExport = `proyecto_id=${encodeURIComponent(proyectoId || '')}&periodo=${encodeURIComponent(filtrosCaja.periodo || '')}&desde=${encodeURIComponent(filtrosCaja.desde || '')}&hasta=${encodeURIComponent(filtrosCaja.hasta || '')}`;
+  const exportCsvUrl = proyectoSeleccionado ? `/caja-chica/reporte.csv?${queryExport}` : '#';
+%>
+
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Caja Chica</h1>
+    <p>Fondo fijo rotativo por obra con rendicion y reposicion automatica</p>
+    <% if (proyectoSeleccionado) { %>
+      <p class="text-muted mb-0">Vista activa: <strong><%= fondo?.proyecto_nombre || 'Proyecto no seleccionado' %></strong>. Todo lo mostrado abajo se calcula solo para esta obra.</p>
+    <% } else { %>
+      <p class="text-muted mb-0">Vista general: primero revisa el panorama multiobra; luego selecciona una obra para ver sus movimientos.</p>
+    <% } %>
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    <span class="badge badge-secondary"><i class="bi bi-building"></i> <%= fondo?.proyecto_nombre || 'Panorama general' %></span>
+  </div>
+</div>
+
+<% if (message) { %>
+  <div class="alert alert-success mb-3"><i class="bi bi-check-circle"></i> <%= message %></div>
+<% } %>
+<% if (error) { %>
+  <div class="alert alert-danger mb-3"><i class="bi bi-exclamation-triangle"></i> <%= error %></div>
+<% } %>
+<% if (saldoBajo) { %>
+  <div class="alert alert-warning mb-3"><i class="bi bi-bell"></i> Alerta de saldo bajo: la caja esta en <strong><%= saldoPct.toFixed(1) %>%</strong> (umbral <%= umbral.toFixed(1) %>%). Genera una liquidacion y solicita reposicion.</div>
+<% } %>
+
+<div class="panel-card mb-4">
+  <div class="panel-card-header">
+    <div class="panel-title"><i class="bi bi-signpost-split"></i> Navegacion y filtros de periodo</div>
+  </div>
+  <div class="panel-body">
+    <form action="/caja-chica" method="get" class="row g-3 align-items-end">
+      <div class="col-12 col-xl-3">
+        <label class="form-label fw-semibold">Selecciona la obra que quieres gestionar</label>
+        <select id="proyectoSelect" name="proyecto_id" class="form-select" onchange="this.form.submit()">
+          <option value="" <%= !proyectoSeleccionado ? 'selected' : '' %>>Panorama general (todas las obras)</option>
+          <% (proyectos || []).forEach((p) => { %>
+            <option value="<%= p.id %>" <%= String(proyectoId || '') === String(p.id) ? 'selected' : '' %>><%= p.nombre %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-12 col-md-6 col-xl-2">
+        <label class="form-label fw-semibold">Intervalo</label>
+        <select name="periodo" id="periodoFiltroCaja" class="form-select">
+          <option value="mes_actual" <%= filtrosCaja.periodo === 'mes_actual' ? 'selected' : '' %>>Mes actual</option>
+          <option value="ultimos_3_meses" <%= filtrosCaja.periodo === 'ultimos_3_meses' ? 'selected' : '' %>>Ultimos 3 meses</option>
+          <option value="ultimos_6_meses" <%= filtrosCaja.periodo === 'ultimos_6_meses' ? 'selected' : '' %>>Ultimos 6 meses</option>
+          <option value="anio_actual" <%= filtrosCaja.periodo === 'anio_actual' ? 'selected' : '' %>>Ano actual</option>
+          <option value="personalizado" <%= filtrosCaja.periodo === 'personalizado' ? 'selected' : '' %>>Personalizado</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-3 col-xl-2">
+        <label class="form-label fw-semibold">Desde</label>
+        <input type="date" name="desde" id="desdeFiltroCaja" class="form-control" value="<%= filtrosCaja.desde || '' %>">
+      </div>
+      <div class="col-6 col-md-3 col-xl-2">
+        <label class="form-label fw-semibold">Hasta</label>
+        <input type="date" name="hasta" id="hastaFiltroCaja" class="form-control" value="<%= filtrosCaja.hasta || '' %>">
+      </div>
+      <div class="col-6 col-md-2 col-xl-1 d-flex gap-2">
+        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i></button>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2 d-flex gap-2 justify-content-xl-end">
+        <a href="<%= exportCsvUrl %>" class="btn btn-outline-success <%= !proyectoSeleccionado ? 'disabled' : '' %>" <%= !proyectoSeleccionado ? 'aria-disabled="true" tabindex="-1"' : '' %>><i class="bi bi-file-earmark-excel"></i> CSV</a>
+        <button type="button" class="btn btn-export-pdf" onclick="exportarCajaChicaPDF()" <%= !proyectoSeleccionado ? 'disabled' : '' %>><i class="bi bi-printer"></i> PDF</button>
+      </div>
+      <div class="col-12 field-hint">Si no seleccionas obra, veras solo el panorama general. Al elegir una obra se mostraran sus movimientos detallados.</div>
+      <div class="col-12">
+        <span class="badge badge-secondary">Rango aplicado: <%= filtrosCaja.desde || '-' %> a <%= filtrosCaja.hasta || '-' %></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% if (!proyectoSeleccionado) { %>
+<div class="panel-card mb-4">
+  <div class="panel-card-header">
+    <div class="panel-title"><i class="bi bi-diagram-3"></i> Estado de Caja Chica por proyecto</div>
+  </div>
+  <div class="panel-body pb-0">
+    <div class="alert alert-info mb-3">
+      <i class="bi bi-info-circle"></i>
+      La asignacion del fondo se hace por proyecto. Usa <strong>Configurar fondo</strong> en la fila de la obra para abrir su formulario y guardar monto fijo, tope y umbral.
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Proyecto</th>
+          <th>Fondo fijo</th>
+          <th>Saldo</th>
+          <th>Por rendir</th>
+          <th>Ultimo reembolso</th>
+          <th>Estado</th>
+          <th>Accion</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!Array.isArray(resumenProyectos) || !resumenProyectos.length) { %>
+          <tr><td colspan="7" class="text-center text-muted py-3">Sin proyectos disponibles.</td></tr>
+        <% } %>
+        <% (resumenProyectos || []).forEach((r) => {
+             const rfijo = Number(r.monto_fijo || 0);
+             const rsaldo = Number(r.saldo_actual || 0);
+             const rpct = rfijo > 0 ? (rsaldo / rfijo) * 100 : 0;
+             const rumbral = Number(r.umbral_alerta_pct || 20);
+             const enAlerta = rfijo > 0 && rpct <= rumbral;
+        %>
+          <tr class="<%= String(r.id) === String(proyectoId) ? 'table-active' : '' %>">
+            <td>
+              <div class="fw-semibold"><%= r.nombre %></div>
+              <small class="text-muted"><%= r.fondo_id ? 'Fondo activo' : 'Sin fondo configurado' %></small>
+            </td>
+            <td>S/ <%= rfijo.toFixed(2) %></td>
+            <td>S/ <%= rsaldo.toFixed(2) %></td>
+            <td>S/ <%= Number(r.total_pendiente || 0).toFixed(2) %></td>
+            <td>S/ <%= Number(r.ultimo_reembolso || 0).toFixed(2) %></td>
+            <td>
+              <span class="rounded-badge <%= enAlerta ? 'estado-cancelado' : 'estado-completado' %>">
+                <%= enAlerta ? 'Saldo bajo' : 'Normal' %>
+              </span>
+            </td>
+            <td>
+              <button
+                type="button"
+                class="btn btn-xs btn-outline-primary"
+                data-bs-toggle="modal"
+                data-bs-target="#configFondoModal"
+                data-proyecto-id="<%= r.id %>"
+                data-proyecto-nombre="<%= r.nombre %>"
+                data-monto-fijo="<%= rfijo.toFixed(2) %>"
+                data-limite-gasto="<%= rfijo > 0 ? (Number(r.limite_gasto_individual || 300)).toFixed(2) : '300.00' %>"
+                data-umbral-alerta="<%= (Number(r.umbral_alerta_pct || 20)).toFixed(2) %>">
+                <i class="bi bi-sliders"></i> Configurar fondo
+              </button>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>
+
+<% if (proyectoSeleccionado) { %>
+<div class="row g-3 mb-4">
+  <div class="col-md-6 col-xl-3">
+    <div class="panel-card h-100 action-shortcut-card action-shortcut-primary">
+      <div class="panel-body d-flex flex-column justify-content-between">
+        <div>
+          <span class="action-shortcut-tag">FONDO</span>
+          <div class="action-shortcut-title"><i class="bi bi-sliders me-1"></i> Configurar fondo</div>
+          <div class="action-shortcut-copy">Ajusta monto fijo, tope por gasto y umbral de alerta.</div>
+        </div>
+        <button
+          type="button"
+          class="btn action-shortcut-btn mt-3"
+          data-bs-toggle="modal"
+          data-bs-target="#configFondoModal"
+          data-proyecto-id="<%= proyectoId %>"
+          data-proyecto-nombre="<%= fondo?.proyecto_nombre || 'Proyecto' %>"
+          data-monto-fijo="<%= Number(fondo?.monto_fijo || 2000).toFixed(2) %>"
+          data-limite-gasto="<%= Number(fondo?.limite_gasto_individual || 300).toFixed(2) %>"
+          data-umbral-alerta="<%= Number(fondo?.umbral_alerta_pct || 20).toFixed(2) %>">
+          Abrir configuracion
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="panel-card h-100 action-shortcut-card action-shortcut-info">
+      <div class="panel-body d-flex flex-column justify-content-between">
+        <div>
+          <span class="action-shortcut-tag">OPERACION</span>
+          <div class="action-shortcut-title"><i class="bi bi-journal-plus me-1"></i> Registro de vales</div>
+          <div class="action-shortcut-copy">Registra gastos y adjunta comprobantes de la obra activa.</div>
+        </div>
+        <button type="button" class="btn action-shortcut-btn mt-3" data-bs-toggle="modal" data-bs-target="#registroValeModal">Registrar vale</button>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="panel-card h-100 action-shortcut-card action-shortcut-success">
+      <div class="panel-body d-flex flex-column justify-content-between">
+        <div>
+          <span class="action-shortcut-tag">CIERRE</span>
+          <div class="action-shortcut-title"><i class="bi bi-archive me-1"></i> Generar liquidacion</div>
+          <div class="action-shortcut-copy">Cierra vales rendidos y crea la liquidacion del periodo.</div>
+        </div>
+        <button type="button" class="btn action-shortcut-btn mt-3" data-bs-toggle="modal" data-bs-target="#generarLiquidacionModal">Iniciar cierre</button>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="panel-card h-100 action-shortcut-card action-shortcut-neutral">
+      <div class="panel-body d-flex flex-column justify-content-between">
+        <div>
+          <span class="action-shortcut-tag">CONTROL</span>
+          <div class="action-shortcut-title"><i class="bi bi-list-ul me-1"></i> Historial de liquidaciones</div>
+          <div class="action-shortcut-copy">Consulta el estado y ejecuta reembolsos pendientes.</div>
+        </div>
+        <button type="button" class="btn action-shortcut-btn mt-3" data-bs-toggle="modal" data-bs-target="#historialLiquidacionesModal">Ver historial</button>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<div class="panel-card mb-4">
+  <div class="panel-card-header">
+    <div class="panel-title"><i class="bi bi-question-circle"></i> Como funciona la liquidacion</div>
+  </div>
+  <div class="panel-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <strong>Paso 1: Registrar y rendir</strong>
+        <div class="text-muted">Los vales se registran contra la obra seleccionada. Los provisionales se deben rendir con comprobante.</div>
+      </div>
+      <div class="col-md-4">
+        <strong>Paso 2: Generar liquidacion</strong>
+        <div class="text-muted">El sistema agrupa todos los vales en estado Rendido de esta obra y crea un cierre de caja.</div>
+      </div>
+      <div class="col-md-4">
+        <strong>Paso 3: Reembolsar</strong>
+        <div class="text-muted">Al reembolsar, se repone el saldo del fondo y se crea automaticamente un asiento contable de egreso.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (!proyectoSeleccionado) { %>
+  <div class="panel-card mb-4">
+    <div class="panel-card-header">
+      <div class="panel-title"><i class="bi bi-globe2"></i> Panorama general de Caja Chica</div>
+      <span class="badge badge-secondary"><%= Number(reporteGeneral.total_vales || 0) %> vales en el periodo</span>
+    </div>
+    <div class="panel-body">
+      <div class="row g-3">
+        <div class="col-md-6 col-xl-3">
+          <div class="kpi-card">
+            <span>Fondo total asignado</span>
+            <h2>S/ <%= Number(panoramaGeneral.totalFondo || 0).toFixed(2) %></h2>
+            <small><%= Number(panoramaGeneral.proyectosConFondo || 0) %> obras con fondo activo</small>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <div class="kpi-card success">
+            <span>Saldo total disponible</span>
+            <h2>S/ <%= Number(panoramaGeneral.totalSaldo || 0).toFixed(2) %></h2>
+            <small>Saldo acumulado de todas las obras</small>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <div class="kpi-card warning">
+            <span>Total por rendir</span>
+            <h2>S/ <%= Number(panoramaGeneral.totalPendiente || 0).toFixed(2) %></h2>
+            <small>Compromisos pendientes de rendicion</small>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <div class="kpi-card <%= Number(panoramaGeneral.proyectosEnAlerta || 0) > 0 ? 'danger' : 'success' %>">
+            <span>Obras en alerta</span>
+            <h2><%= Number(panoramaGeneral.proyectosEnAlerta || 0) %></h2>
+            <small>Con saldo por debajo del umbral</small>
+          </div>
+        </div>
+      </div>
+      <div class="alert alert-info mt-3 mb-0">
+        <i class="bi bi-info-circle"></i>
+        Selecciona una obra en el filtro superior para habilitar registro de vales, liquidaciones, historial y exportaciones por proyecto.
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<% if (proyectoSeleccionado) { %>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6 col-xl">
+    <div class="kpi-card">
+      <div class="kpi-icon"><i class="bi bi-cash-stack"></i></div>
+      <span>Monto asignado</span>
+      <h2>S/ <%= fondoMonto.toFixed(2) %></h2>
+      
+    </div>
+  </div>
+  <div class="col-md-6 col-xl">
+    <div class="kpi-card">
+      <div class="kpi-icon"><i class="bi bi-wallet2"></i></div>
+      <span>Saldo en efectivo</span>
+      <h2>S/ <%= fondoSaldo.toFixed(2) %></h2>
+      
+    </div>
+  </div>
+  <div class="col-md-6 col-xl">
+    <div class="kpi-card warning">
+      <div class="kpi-icon"><i class="bi bi-receipt"></i></div>
+      <span>Gastos por rendir</span>
+      <h2>S/ <%= Number(stats?.gastosPorRendir || 0).toFixed(2) %></h2>
+      
+    </div>
+  </div>
+  <div class="col-md-6 col-xl">
+    <div class="kpi-card success">
+      <div class="kpi-icon"><i class="bi bi-arrow-repeat"></i></div>
+      <span>Rendidos</span>
+      <h2>S/ <%= Number(reporte.monto_rendido || 0).toFixed(2) %></h2>
+      
+    </div>
+  </div>
+  <div class="col-md-6 col-xl">
+    <div class="kpi-card <%= saldoBajo ? 'danger' : 'success' %>">
+      <div class="kpi-icon"><i class="bi bi-speedometer2"></i></div>
+      <span>Nivel de caja</span>
+      <h2><%= saldoPct.toFixed(1) %>%</h2>
+      
+    </div>
+  </div>
+</div>
+
+
+<div class="panel-card mb-4">
+  <div class="panel-card-header">
+    <div class="panel-title"><i class="bi bi-clock-history"></i> Vales recientes</div>
+    <span class="badge badge-secondary"><%= (valesRecientes || []).length %> registros</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Beneficiario</th>
+          <th>Tipo</th>
+          <th>N° Doc</th>
+          <th>Monto</th>
+          <th>Estado</th>
+          <th>Soporte</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!Array.isArray(valesRecientes) || !valesRecientes.length) { %>
+          <tr><td colspan="7" class="text-center text-muted py-3">Sin datos</td></tr>
+        <% } %>
+        <% (valesRecientes || []).forEach((v) => { %>
+          <tr>
+            <td><%= fmtFecha(v.fecha) %></td>
+            <td>
+              <div class="fw-semibold"><%= String(v.beneficiario || '').toUpperCase() %></div>
+              
+            </td>
+            <td>
+              <div><%= v.tipo_documento %></div>
+            </td>
+            <td><%= v.numero_documento || '-' %></td>
+            <td class="fw-semibold">S/ <%= Number(v.monto || 0).toFixed(2) %></td>
+            <td>
+              <span class="rounded-badge <%= v.estado === 'Liquidado' ? 'estado-completado' : (v.estado === 'Vencido' ? 'estado-cancelado' : (v.estado === 'Rendido' ? 'estado-activo' : 'estado-pendiente')) %>">
+                <%= v.estado %>
+              </span>
+            </td>
+            <td>
+              <% if (v.comprobante_url) { %>
+                <a href="<%= v.comprobante_url %>" target="_blank" class="btn btn-xs btn-outline-primary"><i class="bi bi-paperclip"></i> Ver</a>
+              <% } else { %>
+                <span class="text-muted">Sin archivo</span>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="registroValeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-journal-plus me-2"></i>Registro de vales</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="/caja-chica/vales" method="post" enctype="multipart/form-data" class="row g-3 p-3" id="formValeCajaChica">
+        <input type="hidden" name="proyecto_id" value="<%= proyectoId %>">
+        <input type="hidden" name="periodo" value="<%= filtrosCaja.periodo || '' %>">
+        <input type="hidden" name="desde" value="<%= filtrosCaja.desde || '' %>">
+        <input type="hidden" name="hasta" value="<%= filtrosCaja.hasta || '' %>">
+        <div class="col-md-4">
+          <label class="form-label">Fecha</label>
+          <input type="date" class="form-control" name="fecha" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Tipo de documento</label>
+          <select class="form-select" name="tipo_documento" id="tipoDocumentoInput" required>
+            <% (tiposDocumento || []).forEach((tipo) => { %>
+              <option value="<%= tipo %>"><%= tipo %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Categoria</label>
+          <select class="form-select" name="categoria" required>
+            <% (categorias || []).forEach((categoria) => { %>
+              <option value="<%= categoria %>"><%= categoria %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Beneficiario</label>
+          <input type="text" class="form-control" id="beneficiarioInput" name="beneficiario" placeholder="Persona o proveedor" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Numero documento</label>
+          <input type="text" class="form-control" name="numero_documento" placeholder="Opcional">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Monto (S/)</label>
+          <input type="number" class="form-control" name="monto" min="0.01" step="0.01" required>
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">Descripcion</label>
+          <input type="text" class="form-control" name="descripcion" maxlength="255" placeholder="Detalle del gasto" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Vence (solo provisional)</label>
+          <input type="date" class="form-control" name="fecha_vencimiento" id="fechaVencimientoInput">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Comprobante (PDF/JPG/PNG/WEBP)</label>
+          <input type="file" class="form-control" name="comprobante" id="comprobanteInput" accept=".pdf,image/*">
+          <div class="field-hint">Obligatorio para Boleta, Factura y Recibo por Honorarios. En vale provisional puede quedar pendiente.</div>
+        </div>
+        <div class="col-12 d-flex justify-content-end">
+          <button type="button" class="btn btn-outline-secondary me-2" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary"><i class="bi bi-save"></i> Registrar vale</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="generarLiquidacionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-archive me-2"></i>Generar liquidacion</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="/caja-chica/liquidaciones/generar" method="post" class="p-3">
+        <input type="hidden" name="proyecto_id" value="<%= proyectoId %>">
+        <input type="hidden" name="periodo" value="<%= filtrosCaja.periodo || '' %>">
+        <input type="hidden" name="desde" value="<%= filtrosCaja.desde || '' %>">
+        <input type="hidden" name="hasta" value="<%= filtrosCaja.hasta || '' %>">
+        <div class="mb-3">
+          <label class="form-label">Observaciones</label>
+          <textarea class="form-control" name="observaciones" rows="3" placeholder="Opcional"></textarea>
+        </div>
+        <div class="d-flex justify-content-end">
+          <button type="button" class="btn btn-outline-secondary me-2" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary"><i class="bi bi-file-earmark-check"></i> Generar liquidacion</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="historialLiquidacionesModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-list-ul me-2"></i>Historial de liquidaciones</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="table-responsive p-3 pt-0">
+        <table class="table align-middle table-sm mb-0">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Fecha</th>
+              <th>Total</th>
+              <th>Estado</th>
+              <th>Accion</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!Array.isArray(liquidaciones) || !liquidaciones.length) { %>
+              <tr><td colspan="5" class="text-center text-muted py-4">Sin liquidaciones.</td></tr>
+            <% } %>
+            <% (liquidaciones || []).forEach((l) => { %>
+              <tr>
+                <td><strong>#<%= l.id %></strong><div><small class="text-muted"><%= l.total_vales %> vales</small></div></td>
+                <td><%= fmtFecha(l.fecha_corte) %></td>
+                <td class="fw-semibold">S/ <%= Number(l.total_gastado || 0).toFixed(2) %></td>
+                <td>
+                  <span class="rounded-badge <%= l.estado === 'Reembolsada' ? 'estado-completado' : 'estado-pendiente' %>"><%= l.estado %></span>
+                </td>
+                <td>
+                  <% if (l.estado !== 'Reembolsada') { %>
+                    <form action="/caja-chica/liquidaciones/<%= l.id %>/reembolsar" method="post">
+                      <input type="hidden" name="proyecto_id" value="<%= proyectoId %>">
+                      <input type="hidden" name="periodo" value="<%= filtrosCaja.periodo || '' %>">
+                      <input type="hidden" name="desde" value="<%= filtrosCaja.desde || '' %>">
+                      <input type="hidden" name="hasta" value="<%= filtrosCaja.hasta || '' %>">
+                      <button class="btn btn-xs btn-primary"><i class="bi bi-cash-coin"></i> Reembolsar</button>
+                    </form>
+                  <% } else { %>
+                    <small class="text-muted">Asiento #<%= l.reembolsado_asiento_id || '-' %></small>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="rendirValeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-check2-square me-2"></i>Rendir vale provisional</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="rendirValeForm" action="" method="post" enctype="multipart/form-data">
+        <div class="modal-body">
+          <input type="hidden" name="proyecto_id" value="<%= proyectoId %>">
+          <input type="hidden" name="periodo" value="<%= filtrosCaja.periodo || '' %>">
+          <input type="hidden" name="desde" value="<%= filtrosCaja.desde || '' %>">
+          <input type="hidden" name="hasta" value="<%= filtrosCaja.hasta || '' %>">
+          <div class="mb-3">
+            <label class="form-label">Documento final</label>
+            <select name="tipo_documento_final" class="form-select" required>
+              <option value="Boleta">Boleta</option>
+              <option value="Factura">Factura</option>
+              <option value="Recibo por Honorarios">Recibo por Honorarios</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Numero documento</label>
+            <input type="text" name="numero_documento_final" class="form-control" placeholder="Opcional">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Comprobante</label>
+            <input type="file" name="comprobante_rendir" class="form-control" accept=".pdf,image/*" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar rendicion</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<% } %>
+
+<div class="modal fade" id="configFondoModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-sliders me-2"></i><span id="configFondoTitulo">Configurar fondo</span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="/caja-chica/fondo" method="post" id="configFondoForm">
+        <div class="modal-body">
+          <input type="hidden" name="proyecto_id" id="configProyectoId">
+          <input type="hidden" name="periodo" value="<%= filtrosCaja.periodo || '' %>">
+          <input type="hidden" name="desde" value="<%= filtrosCaja.desde || '' %>">
+          <input type="hidden" name="hasta" value="<%= filtrosCaja.hasta || '' %>">
+          <div class="mb-3">
+            <label class="form-label">Fondo fijo (S/)</label>
+            <input type="number" class="form-control" name="monto_fijo" id="configMontoFijo" min="100" step="0.01" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Tope por gasto (S/)</label>
+            <input type="number" class="form-control" name="limite_gasto_individual" id="configLimiteGasto" min="1" step="0.01" required>
+          </div>
+          <div class="mb-1">
+            <label class="form-label">Umbral alerta (%)</label>
+            <input type="number" class="form-control" name="umbral_alerta_pct" id="configUmbralAlerta" min="1" max="100" step="0.01" required>
+          </div>
+          <div class="field-hint">Este guardado aplica solo al proyecto seleccionado en este modal.</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Guardar configuracion</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  function exportarCajaChicaPDF() {
+    if (!document.getElementById('proyectoSelect')?.value) return;
+    const proyectoId = document.getElementById('proyectoSelect')?.value || '<%= proyectoId %>';
+    const periodo = document.getElementById('periodoFiltroCaja')?.value || '<%= filtros.periodo %>';
+    const desde = document.getElementById('desdeFiltroCaja')?.value || '<%= filtros.desde %>';
+    const hasta = document.getElementById('hastaFiltroCaja')?.value || '<%= filtros.hasta %>';
+    
+    let url = `/caja-chica/reporte.pdf?`;
+    if (proyectoId && proyectoId !== '0') url += `proyecto_id=${proyectoId}&`;
+    url += `periodo=${periodo}`;
+    if (desde) url += `&desde=${desde}`;
+    if (hasta) url += `&hasta=${hasta}`;
+
+    let printFrame = document.getElementById('cajaChicaPrintFrame');
+    if (!printFrame) {
+      printFrame = document.createElement('iframe');
+      printFrame.id = 'cajaChicaPrintFrame';
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      printFrame.style.opacity = '0';
+      document.body.appendChild(printFrame);
+    }
+
+    printFrame.onload = function () {
+      try {
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+      } catch (_e) {
+        // Si el navegador bloquea la impresion en iframe, se mantiene el dashboard sin redireccionar.
+      }
+    };
+
+    printFrame.src = url + '&auto_print=0&_t=' + Date.now();
+  }
+
+  (function () {
+    const tipoDocumentoInput = document.getElementById('tipoDocumentoInput');
+    const comprobanteInput = document.getElementById('comprobanteInput');
+    const fechaVencimientoInput = document.getElementById('fechaVencimientoInput');
+
+    function syncValeFormRules() {
+      if (!tipoDocumentoInput || !comprobanteInput || !fechaVencimientoInput) return;
+      const isProvisional = tipoDocumentoInput.value === 'Vale Provisional';
+      comprobanteInput.required = !isProvisional;
+      fechaVencimientoInput.required = isProvisional;
+      if (!isProvisional) fechaVencimientoInput.value = '';
+    }
+
+    if (tipoDocumentoInput) {
+      tipoDocumentoInput.addEventListener('change', syncValeFormRules);
+      syncValeFormRules();
+    }
+
+    const beneficiarioInput = document.getElementById('beneficiarioInput');
+    if (beneficiarioInput) {
+      beneficiarioInput.addEventListener('input', function () {
+        this.value = this.value.toUpperCase();
+      });
+      beneficiarioInput.addEventListener('blur', function () {
+        this.value = this.value.trim().toUpperCase();
+      });
+    }
+
+    const rendirModal = document.getElementById('rendirValeModal');
+    const rendirForm = document.getElementById('rendirValeForm');
+    if (rendirModal && rendirForm) {
+      rendirModal.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        const valeId = button ? button.getAttribute('data-vale-id') : null;
+        if (!valeId) return;
+        rendirForm.action = '/caja-chica/vales/' + valeId + '/rendir';
+      });
+    }
+
+    const configFondoModal = document.getElementById('configFondoModal');
+    const configTitulo = document.getElementById('configFondoTitulo');
+    const configProyectoId = document.getElementById('configProyectoId');
+    const configMontoFijo = document.getElementById('configMontoFijo');
+    const configLimiteGasto = document.getElementById('configLimiteGasto');
+    const configUmbralAlerta = document.getElementById('configUmbralAlerta');
+
+    if (configFondoModal) {
+      configFondoModal.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        if (!button) return;
+
+        const proyectoId = button.getAttribute('data-proyecto-id') || '';
+        const proyectoNombre = button.getAttribute('data-proyecto-nombre') || 'Proyecto';
+        const montoFijo = button.getAttribute('data-monto-fijo') || '2000.00';
+        const limiteGasto = button.getAttribute('data-limite-gasto') || '300.00';
+        const umbralAlerta = button.getAttribute('data-umbral-alerta') || '20.00';
+
+        if (configTitulo) configTitulo.textContent = 'Configurar fondo - ' + proyectoNombre;
+        if (configProyectoId) configProyectoId.value = proyectoId;
+        if (configMontoFijo) configMontoFijo.value = montoFijo;
+        if (configLimiteGasto) configLimiteGasto.value = limiteGasto;
+        if (configUmbralAlerta) configUmbralAlerta.value = umbralAlerta;
+      });
+    }
+
+    const periodoFiltroCaja = document.getElementById('periodoFiltroCaja');
+    const desdeFiltroCaja = document.getElementById('desdeFiltroCaja');
+    const hastaFiltroCaja = document.getElementById('hastaFiltroCaja');
+
+    function syncPeriodoCustomState() {
+      if (!periodoFiltroCaja || !desdeFiltroCaja || !hastaFiltroCaja) return;
+      const isCustom = periodoFiltroCaja.value === 'personalizado';
+      desdeFiltroCaja.disabled = !isCustom;
+      hastaFiltroCaja.disabled = !isCustom;
+      if (!isCustom) {
+        desdeFiltroCaja.value = '';
+        hastaFiltroCaja.value = '';
+      }
+    }
+
+    if (periodoFiltroCaja) {
+      periodoFiltroCaja.addEventListener('change', syncPeriodoCustomState);
+      syncPeriodoCustomState();
+    }
+  })();
+</script>

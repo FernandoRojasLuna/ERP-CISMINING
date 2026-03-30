@@ -205,6 +205,63 @@ CREATE TABLE asientos_contables (
   FOREIGN KEY (proyecto_id) REFERENCES proyectos(id) ON DELETE SET NULL
 );
 
+CREATE TABLE caja_chica_fondos (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  proyecto_id INT NOT NULL,
+  responsable_user_id INT NULL,
+  monto_fijo DECIMAL(12,2) NOT NULL DEFAULT 2000.00,
+  limite_gasto_individual DECIMAL(12,2) NOT NULL DEFAULT 300.00,
+  umbral_alerta_pct DECIMAL(5,2) NOT NULL DEFAULT 20.00,
+  saldo_actual DECIMAL(12,2) NOT NULL DEFAULT 2000.00,
+  estado ENUM('Activo','Cerrado') NOT NULL DEFAULT 'Activo',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_caja_chica_fondo_proyecto_activo (proyecto_id, estado),
+  FOREIGN KEY (proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE,
+  FOREIGN KEY (responsable_user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE caja_chica_liquidaciones (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  fondo_id INT NOT NULL,
+  fecha_corte DATE NOT NULL,
+  total_gastado DECIMAL(12,2) NOT NULL DEFAULT 0,
+  total_vales INT NOT NULL DEFAULT 0,
+  estado ENUM('Borrador','Aprobada','Reembolsada') NOT NULL DEFAULT 'Borrador',
+  observaciones VARCHAR(255) NULL,
+  aprobado_por_user_id INT NULL,
+  aprobado_at DATETIME NULL,
+  reembolsado_asiento_id INT NULL,
+  created_by_user_id INT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (fondo_id) REFERENCES caja_chica_fondos(id) ON DELETE CASCADE,
+  FOREIGN KEY (aprobado_por_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (reembolsado_asiento_id) REFERENCES asientos_contables(id) ON DELETE SET NULL
+);
+
+CREATE TABLE caja_chica_vales (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  fondo_id INT NOT NULL,
+  liquidacion_id INT NULL,
+  fecha DATE NOT NULL,
+  beneficiario VARCHAR(150) NOT NULL,
+  tipo_documento VARCHAR(50) NOT NULL,
+  numero_documento VARCHAR(60) NULL,
+  categoria VARCHAR(80) NOT NULL,
+  descripcion VARCHAR(255) NOT NULL,
+  monto DECIMAL(12,2) NOT NULL,
+  comprobante_url VARCHAR(255) NULL,
+  estado ENUM('Pendiente','Rendido','Vencido','Liquidado') NOT NULL DEFAULT 'Pendiente',
+  fecha_vencimiento DATETIME NULL,
+  created_by_user_id INT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (fondo_id) REFERENCES caja_chica_fondos(id) ON DELETE CASCADE,
+  FOREIGN KEY (liquidacion_id) REFERENCES caja_chica_liquidaciones(id) ON DELETE SET NULL,
+  FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
 CREATE TABLE documentos (
   id INT AUTO_INCREMENT PRIMARY KEY,
   proyecto_id INT NULL,

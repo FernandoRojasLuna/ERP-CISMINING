@@ -13,7 +13,8 @@ const PLAN_CUENTAS = {
     'Alquiler de Oficina',
     'Servicios Basicos',
     'Sueldos Administrativos',
-    'Utiles de Escritorio'
+    'Utiles de Escritorio',
+    'Caja Chica - Reembolso'
   ]
 };
 
