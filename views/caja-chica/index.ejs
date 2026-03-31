@@ -25,7 +25,7 @@
 <div class="page-header">
   <div class="page-header-title">
     <h1>Caja Chica</h1>
-    <p>Fondo fijo rotativo por obra con rendicion y reposicion automatica</p>
+    <p>Fondo fijo rotativo por obra con rendicion y reposicion controlada</p>
     <% if (proyectoSeleccionado) { %>
       <p class="text-muted mb-0">Vista activa: <strong><%= fondo?.proyecto_nombre || 'Proyecto no seleccionado' %></strong>. Todo lo mostrado abajo se calcula solo para esta obra.</p>
     <% } else { %>
@@ -246,7 +246,7 @@
       </div>
       <div class="col-md-4">
         <strong>Paso 3: Reembolsar</strong>
-        <div class="text-muted">Al reembolsar, se repone el saldo del fondo y se crea automaticamente un asiento contable de egreso.</div>
+        <div class="text-muted">Al reembolsar, eliges el tipo de reposicion: completar fondo, igual a la liquidacion, monto personalizado o no reponer por ahora.</div>
       </div>
     </div>
   </div>
@@ -519,13 +519,18 @@
                 </td>
                 <td>
                   <% if (l.estado !== 'Reembolsada') { %>
-                    <form action="/caja-chica/liquidaciones/<%= l.id %>/reembolsar" method="post">
-                      <input type="hidden" name="proyecto_id" value="<%= proyectoId %>">
-                      <input type="hidden" name="periodo" value="<%= filtrosCaja.periodo || '' %>">
-                      <input type="hidden" name="desde" value="<%= filtrosCaja.desde || '' %>">
-                      <input type="hidden" name="hasta" value="<%= filtrosCaja.hasta || '' %>">
-                      <button class="btn btn-xs btn-primary"><i class="bi bi-cash-coin"></i> Reembolsar</button>
-                    </form>
+                    <button
+                      type="button"
+                      class="btn btn-xs btn-primary"
+                      data-bs-toggle="modal"
+                      data-bs-target="#reembolsoDecisionModal"
+                      data-liquidacion-id="<%= l.id %>"
+                      data-total-gastado="<%= Number(l.total_gastado || 0).toFixed(2) %>"
+                      data-total-vales="<%= Number(l.total_vales || 0) %>"
+                      data-saldo-actual="<%= Number(fondo?.saldo_actual || 0).toFixed(2) %>"
+                      data-monto-fijo="<%= Number(fondo?.monto_fijo || 0).toFixed(2) %>">
+                      <i class="bi bi-cash-coin"></i> Reembolsar
+                    </button>
                   <% } else { %>
                     <small class="text-muted">Asiento #<%= l.reembolsado_asiento_id || '-' %></small>
                   <% } %>
@@ -535,6 +540,59 @@
           </tbody>
         </table>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="reembolsoDecisionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i>Decision de reposicion</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="reembolsoDecisionForm" method="post" class="p-3">
+        <input type="hidden" name="proyecto_id" value="<%= proyectoId %>">
+        <input type="hidden" name="periodo" value="<%= filtrosCaja.periodo || '' %>">
+        <input type="hidden" name="desde" value="<%= filtrosCaja.desde || '' %>">
+        <input type="hidden" name="hasta" value="<%= filtrosCaja.hasta || '' %>">
+
+        <div class="alert alert-light border mb-3" id="resumenReembolsoLiquidacion"></div>
+
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="radio" name="reposicion_tipo" id="reposicionCompletar" value="completar_fondo" checked>
+          <label class="form-check-label" for="reposicionCompletar">
+            Reponer para completar fondo fijo
+          </label>
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="radio" name="reposicion_tipo" id="reposicionIgualLiquidacion" value="igual_liquidacion">
+          <label class="form-check-label" for="reposicionIgualLiquidacion">
+            Reponer igual al total de la liquidacion
+          </label>
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="radio" name="reposicion_tipo" id="reposicionPersonalizada" value="personalizado">
+          <label class="form-check-label" for="reposicionPersonalizada">
+            Reponer monto personalizado
+          </label>
+        </div>
+        <div class="mb-3">
+          <input type="number" class="form-control" name="monto_reposicion" id="montoReposicionInput" min="0.01" step="0.01" placeholder="S/ 0.00" disabled>
+          <div class="field-hint" id="montoReposicionHint">Solo se usa cuando eliges monto personalizado.</div>
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="radio" name="reposicion_tipo" id="reposicionSinAccion" value="sin_reposicion">
+          <label class="form-check-label" for="reposicionSinAccion">
+            No reponer por ahora
+          </label>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Confirmar decision</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
@@ -739,6 +797,67 @@
     if (periodoFiltroCaja) {
       periodoFiltroCaja.addEventListener('change', syncPeriodoCustomState);
       syncPeriodoCustomState();
+    }
+
+    const reembolsoDecisionModal = document.getElementById('reembolsoDecisionModal');
+    const reembolsoDecisionForm = document.getElementById('reembolsoDecisionForm');
+    const montoReposicionInput = document.getElementById('montoReposicionInput');
+    const montoReposicionHint = document.getElementById('montoReposicionHint');
+    const resumenReembolsoLiquidacion = document.getElementById('resumenReembolsoLiquidacion');
+
+    function syncTipoReposicion() {
+      if (!reembolsoDecisionForm || !montoReposicionInput) return;
+      const seleccionado = reembolsoDecisionForm.querySelector('input[name="reposicion_tipo"]:checked');
+      const esPersonalizado = seleccionado && seleccionado.value === 'personalizado';
+      montoReposicionInput.disabled = !esPersonalizado;
+      montoReposicionInput.required = esPersonalizado;
+      if (!esPersonalizado) montoReposicionInput.value = '';
+    }
+
+    if (reembolsoDecisionForm) {
+      reembolsoDecisionForm.addEventListener('change', function (event) {
+        if (event.target && event.target.name === 'reposicion_tipo') {
+          syncTipoReposicion();
+        }
+      });
+      syncTipoReposicion();
+    }
+
+    if (reembolsoDecisionModal && reembolsoDecisionForm) {
+      reembolsoDecisionModal.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        if (!button) return;
+
+        const liquidacionId = button.getAttribute('data-liquidacion-id') || '';
+        const totalGastado = Number(button.getAttribute('data-total-gastado') || 0);
+        const totalVales = Number(button.getAttribute('data-total-vales') || 0);
+        const saldoActual = Number(button.getAttribute('data-saldo-actual') || 0);
+        const montoFijo = Number(button.getAttribute('data-monto-fijo') || 0);
+        const faltante = Math.max(0, Number((montoFijo - saldoActual).toFixed(2)));
+
+        reembolsoDecisionForm.action = '/caja-chica/liquidaciones/' + liquidacionId + '/reembolsar';
+
+        if (resumenReembolsoLiquidacion) {
+          resumenReembolsoLiquidacion.innerHTML = `
+            <strong>Liquidacion #${liquidacionId}</strong><br>
+            Total liquidado: <strong>S/ ${totalGastado.toFixed(2)}</strong> (${totalVales} vales)<br>
+            Saldo actual: S/ ${saldoActual.toFixed(2)} | Fondo fijo: S/ ${montoFijo.toFixed(2)}<br>
+            Faltante para completar fondo: <strong>S/ ${faltante.toFixed(2)}</strong>
+          `;
+        }
+
+        const optionCompletar = document.getElementById('reposicionCompletar');
+        if (optionCompletar) optionCompletar.checked = true;
+
+        if (montoReposicionInput) {
+          montoReposicionInput.max = faltante > 0 ? String(faltante.toFixed(2)) : '';
+        }
+        if (montoReposicionHint) {
+          montoReposicionHint.textContent = `Solo se usa cuando eliges monto personalizado. Maximo permitido: S/ ${faltante.toFixed(2)}.`;
+        }
+
+        syncTipoReposicion();
+      });
     }
   })();
 </script>

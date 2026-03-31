@@ -201,8 +201,8 @@
                 <a href="/rrhh/usuarios/<%= u.id %>/editar" class="btn btn-xs btn-primary" title="Editar">
                   <i class="bi bi-pencil"></i>
                 </a>
-                <button type="button" class="btn btn-xs btn-outline-danger" title="Desactivar"
-                        onclick="eliminarUsuario(<%= u.id %>, '<%= u.username %>')">
+                <button type="button" class="btn btn-xs btn-outline-danger" title="<%= u.activo ? 'Desactivar' : 'Eliminar definitivo' %>"
+                  onclick='eliminarUsuario(<%= u.id %>, <%- JSON.stringify(u.username || "") %>, <%= u.activo ? "true" : "false" %>)'>
                   <i class="bi bi-trash"></i>
                 </button>
               </div>
@@ -356,21 +356,60 @@
 </div>
 
 <script>
-  async function eliminarUsuario(usuarioId, username) {
-    if (!confirm(`¿Estás seguro de que quieres desactivar al usuario "${username}"?`)) return;
+  function mostrarToastRRHH(mensaje, tipo = 'success') {
+    let container = document.getElementById('rrhhToastContainer');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'rrhhToastContainer';
+      container.className = 'toast-container position-fixed top-0 end-0 p-3';
+      container.style.zIndex = '1080';
+      document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-bg-${tipo} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+    toast.innerHTML = `
+      <div class="d-flex">
+        <div class="toast-body">${mensaje}</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    `;
+
+    container.appendChild(toast);
+    const instance = bootstrap.Toast.getOrCreateInstance(toast, { delay: 2500 });
+    instance.show();
+    toast.addEventListener('hidden.bs.toast', () => toast.remove());
+  }
+
+  async function eliminarUsuario(usuarioId, username, estaActivo) {
+    const accion = estaActivo ? 'desactivar' : 'eliminar definitivamente';
+    if (!confirm(`¿Estás seguro de que quieres ${accion} al usuario "${username}"?`)) return;
+
+    const url = estaActivo
+      ? `/rrhh/usuarios/${usuarioId}`
+      : `/rrhh/usuarios/${usuarioId}?force=1`;
+
     try {
-      const response = await fetch(`/rrhh/usuarios/${usuarioId}`, {
+      const response = await fetch(url, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' }
       });
-      const result = await response.json();
-      if (result.success) {
-        location.reload();
+      const result = await response.json().catch(() => ({
+        success: false,
+        message: 'Respuesta invalida del servidor'
+      }));
+
+      if (response.ok && result.success) {
+        mostrarToastRRHH(result.message || 'Operacion completada.', 'success');
+        setTimeout(() => location.reload(), 600);
       } else {
-        alert('Error: ' + result.message);
+        mostrarToastRRHH(result.message || 'No se pudo procesar la accion.', 'danger');
       }
     } catch (error) {
-      alert('Error al desactivar el usuario');
+      mostrarToastRRHH('Error al procesar la accion del usuario.', 'danger');
     }
   }
 </script>

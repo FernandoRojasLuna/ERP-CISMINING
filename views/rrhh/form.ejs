@@ -224,6 +224,7 @@
                 </div>
                 <div class="modal-body">
                     <form id="formCambiarPassword">
+                        <div id="passwordFeedback" class="alert d-none" role="alert"></div>
                         <div class="mb-3">
                             <label for="newPassword" class="form-label">Nueva Contraseña</label>
                             <input type="password" class="form-control" id="newPassword" required 
@@ -245,22 +246,44 @@
     </div>
 
     <script>
+    function mostrarFeedbackPassword(message, type = 'success') {
+        const feedback = document.getElementById('passwordFeedback');
+        if (!feedback) return;
+
+        feedback.className = `alert alert-${type} d-block`;
+        feedback.textContent = message;
+    }
+
+    function limpiarFeedbackPassword() {
+        const feedback = document.getElementById('passwordFeedback');
+        if (!feedback) return;
+
+        feedback.className = 'alert d-none';
+        feedback.textContent = '';
+    }
+
+    document.getElementById('modalCambiarPassword').addEventListener('shown.bs.modal', function() {
+        limpiarFeedbackPassword();
+    });
+
     document.getElementById('btnGuardarPassword').addEventListener('click', async function() {
         const newPass = document.getElementById('newPassword').value;
         const confirmPass = document.getElementById('confirmPassword').value;
 
         if (newPass !== confirmPass) {
-            alert('⚠️ Las contraseñas no coinciden');
+            mostrarFeedbackPassword('Las contraseñas no coinciden.', 'warning');
             return;
         }
 
         if (newPass.length < 6) {
-            alert('⚠️ La contraseña debe tener al menos 6 caracteres');
+            mostrarFeedbackPassword('La contraseña debe tener al menos 6 caracteres.', 'warning');
             return;
         }
 
         try {
-            const response = await fetch('/rrhh/usuarios/<%= usuario.id %>/cambiar-contraseña', {
+            limpiarFeedbackPassword();
+
+            const response = await fetch('/rrhh/usuarios/<%= usuario.id %>/cambiar-contrasena', {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json'
@@ -268,17 +291,26 @@
                 body: JSON.stringify({ password: newPass })
             });
 
-            const result = await response.json();
+            const result = await response.json().catch(() => ({
+                success: false,
+                message: 'Respuesta invalida del servidor'
+            }));
+
+            if (!response.ok) {
+                mostrarFeedbackPassword(result.message || 'No se pudo actualizar la contraseña.', 'danger');
+                return;
+            }
+
             if (result.success) {
-                alert('✓ ' + result.message);
+                mostrarFeedbackPassword(result.message || 'Contraseña actualizada exitosamente.', 'success');
                 bootstrap.Modal.getInstance(document.getElementById('modalCambiarPassword')).hide();
                 document.getElementById('formCambiarPassword').reset();
             } else {
-                alert('❌ Error: ' + result.message);
+                mostrarFeedbackPassword(result.message || 'No se pudo actualizar la contraseña.', 'danger');
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('❌ Error al cambiar la contraseña');
+            mostrarFeedbackPassword('Error al cambiar la contraseña.', 'danger');
         }
     });
     </script>

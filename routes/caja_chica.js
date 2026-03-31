@@ -964,6 +964,34 @@ router.post('/liquidaciones/:id/reembolsar', requireRole('admin'), async (req, r
       return res.redirect('/caja-chica?' + returnQuery + '&message=' + encodeURIComponent('La liquidacion ya fue reembolsada.'));
     }
 
+    const tipoReposicion = String(req.body.reposicion_tipo || 'completar_fondo').trim();
+    const montoPersonalizado = parseMoney(req.body.monto_reposicion, 0);
+    const saldoActual = Number(liq.saldo_actual || 0);
+    const montoFijo = Number(liq.monto_fijo || 0);
+    const montoPendienteParaCompletar = Number(Math.max(0, montoFijo - saldoActual).toFixed(2));
+
+    if (tipoReposicion === 'sin_reposicion') {
+      return res.redirect('/caja-chica?' + returnQuery + '&message=' + encodeURIComponent('No se ejecuto la reposicion. La liquidacion permanece pendiente de reembolso.'));
+    }
+
+    let montoReposicion = 0;
+    if (tipoReposicion === 'igual_liquidacion') {
+      montoReposicion = Number(liq.total_gastado || 0);
+    } else if (tipoReposicion === 'personalizado') {
+      montoReposicion = montoPersonalizado;
+    } else {
+      montoReposicion = montoPendienteParaCompletar;
+    }
+
+    montoReposicion = Number(montoReposicion.toFixed(2));
+    if (montoReposicion <= 0) {
+      return res.redirect('/caja-chica?' + returnQuery + '&error=' + encodeURIComponent('El monto de reposicion debe ser mayor a 0.'));
+    }
+
+    if (montoReposicion > montoPendienteParaCompletar) {
+      return res.redirect('/caja-chica?' + returnQuery + '&error=' + encodeURIComponent(`El monto excede el faltante para completar el fondo (S/ ${montoPendienteParaCompletar.toFixed(2)}).`));
+    }
+
     const registradoPor = String(req.session?.user?.username || req.session?.user?.nombre || 'SISTEMA').toUpperCase();
     const descripcion = `Reposicion Caja Chica - Liquidacion #${liq.id} (${liq.total_vales} vales)`;
 
@@ -971,7 +999,7 @@ router.post('/liquidaciones/:id/reembolsar', requireRole('admin'), async (req, r
       `INSERT INTO asientos_contables
         (fecha, tipo, categoria, descripcion, monto, estado_pago, registrado_por, proyecto_id)
        VALUES (CURDATE(), 'Egreso', 'Caja Chica - Reembolso', ?, ?, 'Pagado', ?, ?)`,
-      [descripcion, Number(liq.total_gastado || 0), registradoPor, liq.proyecto_id]
+      [descripcion, montoReposicion, registradoPor, liq.proyecto_id]
     );
 
     await db.query(
@@ -985,10 +1013,10 @@ router.post('/liquidaciones/:id/reembolsar', requireRole('admin'), async (req, r
       `UPDATE caja_chica_fondos
        SET saldo_actual = LEAST(monto_fijo, ROUND(saldo_actual + ?, 2))
        WHERE id = ?`,
-      [Number(liq.total_gastado || 0), liq.fondo_id]
+      [montoReposicion, liq.fondo_id]
     );
 
-    return res.redirect('/caja-chica?' + returnQuery + '&message=' + encodeURIComponent('✓ Reembolso ejecutado y asiento contable generado automaticamente.'));
+    return res.redirect('/caja-chica?' + returnQuery + '&message=' + encodeURIComponent('✓ Reembolso ejecutado segun el monto seleccionado y asiento contable generado.'));
   } catch (error) {
     next(error);
   }

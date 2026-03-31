@@ -731,27 +731,44 @@ router.put('/usuarios/:id', requireRole('admin'), [
   }
 });
 
-// PATCH /usuarios/:id/cambiar-contraseña - Cambiar contraseña
-router.patch('/usuarios/:id/cambiar-contraseña', requireRole('admin'), [
+const validateChangePassword = [
   body('password')
     .notEmpty().withMessage('La contraseña es requerida')
     .isLength({ min: 6 }).withMessage('La contraseña debe tener al menos 6 caracteres')
-], async (req, res, next) => {
+];
+
+async function handleChangePassword(req, res) {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.json({ success: false, message: errors.array()[0].msg });
+      return res.status(400).json({ success: false, message: errors.array()[0].msg });
+    }
+
+    const userId = Number(req.params.id);
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'ID de usuario inválido' });
+    }
+
+    const [rows] = await db.query('SELECT id FROM users WHERE id = ?', [userId]);
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
     }
 
     const hashedPassword = await bcrypt.hash(req.body.password, 10);
-    await db.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, req.params.id]);
+    await db.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
 
-    res.json({ success: true, message: '✓ Contraseña actualizada exitosamente' });
-  } catch (error) { 
+    return res.json({ success: true, message: '✓ Contraseña actualizada exitosamente' });
+  } catch (error) {
     console.error('Error cambiando contraseña:', error);
-    next(error); 
+    return res.status(500).json({ success: false, message: 'No se pudo actualizar la contraseña' });
   }
-});
+}
+
+// PATCH /usuarios/:id/cambiar-contrasena - Cambiar contraseña (ruta principal ASCII)
+router.patch('/usuarios/:id/cambiar-contrasena', requireRole('admin'), validateChangePassword, handleChangePassword);
+
+// Compatibilidad: mantener también la ruta anterior con ñ
+router.patch('/usuarios/:id/cambiar-contraseña', requireRole('admin'), validateChangePassword, handleChangePassword);
 
 // DELETE /usuarios/:id - Eliminar usuario
 router.delete('/usuarios/:id', requireRole('admin'), async (req, res, next) => {
@@ -767,7 +784,7 @@ router.delete('/usuarios/:id', requireRole('admin'), async (req, res, next) => {
     // Verificar si el usuario existe
     let user = null;
     try {
-      const result = await db.query('SELECT username FROM users WHERE id = ?', [req.params.id]);
+      const result = await db.query('SELECT username, activo FROM users WHERE id = ?', [req.params.id]);
       user = result[0]?.[0] || null;
     } catch (dbError) {
       console.error('Error consultando usuario:', dbError);
@@ -780,16 +797,29 @@ router.delete('/usuarios/:id', requireRole('admin'), async (req, res, next) => {
       });
     }
 
-    // Eliminar usuario (solo cambiar a inactivo es más seguro)
+    const forceDelete = String(req.query.force || '').toLowerCase() === '1' || String(req.query.force || '').toLowerCase() === 'true';
+
+    // Si ya esta inactivo o se solicita force=1, eliminar definitivamente de users.
+    if (Number(user.activo) === 0 || forceDelete) {
+      await db.query('DELETE FROM users WHERE id = ?', [req.params.id]);
+
+      return res.json({
+        success: true,
+        action: 'deleted',
+        message: '✓ Usuario eliminado definitivamente'
+      });
+    }
+
     await db.query('UPDATE users SET activo = 0 WHERE id = ?', [req.params.id]);
 
-    res.json({ 
-      success: true, 
-      message: '✓ Usuario desactivado exitosamente' 
+    return res.json({
+      success: true,
+      action: 'deactivated',
+      message: '✓ Usuario desactivado exitosamente'
     });
   } catch (error) { 
     console.error('Error desactivando usuario:', error);
-    next(error); 
+    return res.status(500).json({ success: false, message: 'No se pudo procesar la eliminación del usuario' });
   }
 });
 
